@@ -31,7 +31,6 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
-        Deactivated += OnDeactivated; // 失焦即收起（点到别处就消失，和 DeskBox 一致）
         PreviewKeyDown += OnPreviewKeyDown;
         ViewModel_ResultsChanged();
     }
@@ -105,6 +104,51 @@ public partial class MainWindow
     // ───────────────────────────── 顶栏按钮 ─────────────────────────────
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    /// <summary>
+    /// 拖动窗口：顶栏整条都能拖（输入框和按钮上的鼠标事件不拦，否则点不动）。
+    /// 双击顶栏 = 最大化/还原，和普通窗口一致。
+    /// </summary>
+    private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && IsInteractive(source)) return;
+
+        if (e.ClickCount == 2)
+        {
+            MaximizeButton_Click(sender, e);
+            return;
+        }
+
+        try { DragMove(); }
+        catch { /* 拖拽过程中松开鼠标会抛，忽略 */ }
+    }
+
+    /// <summary>点在输入框/按钮上时不要触发窗口拖动。</summary>
+    private static bool IsInteractive(DependencyObject source)
+    {
+        for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is System.Windows.Controls.Primitives.ButtonBase or System.Windows.Controls.TextBox) return true;
+            if (node is FrameworkElement { Name: "SearchBox" }) return true;
+        }
+        return false;
+    }
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        bool maximized = WindowState == WindowState.Maximized;
+        MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
+        RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
+
+        // 最大化时把外层圆角收掉，否则屏幕四角会露出底色
+        if (RootPanel != null) RootPanel.Radius = maximized ? 0 : 28;
+        RootPanel?.InvalidateVisual();
+    }
 
     private void FilterButton_Click(object sender, RoutedEventArgs e)
     {

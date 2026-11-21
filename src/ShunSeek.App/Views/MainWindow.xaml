@@ -11,13 +11,20 @@
         WindowBackdropType="Mica"
         ExtendsContentIntoTitleBar="True"
         WindowCornerPreference="Round"
-        ResizeMode="NoResize"
-        ShowInTaskbar="False"
+        ResizeMode="CanResize"
+        ShowInTaskbar="True"
+        MinWidth="520" MinHeight="360"
         Topmost="True"
-        Background="Transparent">
+        Background="Transparent"
+        StateChanged="Window_StateChanged">
 
     <!-- 液态玻璃面板：椭圆角（RadiusY > RadiusX = 连续曲率的饱满感）+ 半透明白渐变
          + 流动高光 + 沿圆角走的 1px 渐变描边。桌面透过 Mica 进来，白渐变盖在上面就是玻璃。 -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+                      GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
     <ui:FluentWindow.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
@@ -130,7 +137,7 @@
         </Style>
     </ui:FluentWindow.Resources>
 
-    <ctl:LiquidPanel Radius="{StaticResource RadiusOuter}"
+    <ctl:LiquidPanel x:Name="RootPanel" Radius="{StaticResource RadiusOuter}"
                      Fill="{StaticResource GlassFill}" Stroke="{StaticResource GlassStroke}">
         <Grid>
             <!-- 面板里的柔光斑：玻璃后面透出来的颜色倾向（参考稿那三团渐变） -->
@@ -172,9 +179,12 @@
                 </Grid.RowDefinitions>
 
                 <!-- ① 搜索栏 + 筛选 + 关闭 -->
-                <Grid Grid.Row="0" Margin="22,20,18,4">
+                <Grid Grid.Row="0" Margin="22,20,18,4" Background="Transparent"
+                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -247,6 +257,20 @@
                     </Button>
 
                     <Button Grid.Column="2" Style="{StaticResource ToolButton}"
+                            Click="MinimizeButton_Click" ToolTip="最小化">
+                        <TextBlock Text="&#xE921;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                    </Button>
+
+                    <Button Grid.Column="3" x:Name="MaximizeButton" Style="{StaticResource ToolButton}"
+                            Click="MaximizeButton_Click" ToolTip="最大化">
+                        <Grid>
+                            <TextBlock x:Name="MaximizeGlyph" Text="&#xE922;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                            <TextBlock x:Name="RestoreGlyph" Text="&#xE923;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                                       Visibility="Collapsed" />
+                        </Grid>
+                    </Button>
+
+                    <Button Grid.Column="4" Style="{StaticResource ToolButton}"
                             Click="CloseButton_Click" ToolTip="关闭 (Esc)">
                         <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="13" />
                     </Button>
