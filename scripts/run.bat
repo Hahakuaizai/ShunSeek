@@ -52,6 +52,13 @@ if defined BENCH (
     exit /b 0
 )
 
+rem 程序要是还跑着，exe 被占用，编译会失败——先结束它
+taskkill /im ShunSeek.exe /f >nul 2>nul
+if not errorlevel 1 (
+    ping -n 1 -w 500 127.0.0.1 >nul
+    echo 已结束上一个实例。
+)
+
 if not defined NOBUILD (
     echo [1/2] 编译 %CONFIG% ...
     "%DOTNET%" build "src\ShunSeek.App\ShunSeek.App.csproj" -c %CONFIG%
@@ -75,12 +82,6 @@ if not exist "%EXE%" (
     exit /b 1
 )
 
-rem 程序是单实例的：不先结束旧进程，新的会自己退出（只把旧窗口叫出来）
-taskkill /im ShunSeek.exe /f >nul 2>nul
-if not errorlevel 1 (
-    ping -n 1 -w 500 127.0.0.1 >nul
-    echo 已结束上一个实例。
-)
 
 echo [2/2] 启动
 if defined SHOW (
