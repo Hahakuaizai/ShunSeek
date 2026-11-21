@@ -113,6 +113,27 @@ public partial class MainWindow
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
 
+    /// <summary>把窗口内容渲染成 PNG（离屏验证样式用，不依赖屏幕合成）。</summary>
+    public void CaptureToPng(string path)
+    {
+        var root = RootPanel;
+        root.UpdateLayout();
+
+        int width = (int)Math.Ceiling(root.ActualWidth);
+        int height = (int)Math.Ceiling(root.ActualHeight);
+        if (width <= 0 || height <= 0) throw new InvalidOperationException("窗口还没完成布局");
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(root);
+
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
+    }
+
+
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void MaximizeButton_Click(object sender, RoutedEventArgs e)

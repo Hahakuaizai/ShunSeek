@@ -112,6 +112,48 @@ public partial class App : System.Windows.Application
             });
         }
 
+        // 开发/截图用：--shot <png> 把界面渲染成图片后退出。
+        // 窗口放在屏幕外且不抢焦点，用户看不到——改样式时用它验证。
+        int shotIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase));
+        if (shotIndex >= 0 && shotIndex + 1 < e.Args.Length)
+        {
+            var shotPath = e.Args[shotIndex + 1];
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                window.Left = -6000;
+                window.Top = -6000;
+                window.ShowActivated = false;
+                window.Show();
+                if (initialQuery != null) window.ApplyInitialQuery(initialQuery);
+                _ = _index?.StartAsync();
+
+                // 索引没就绪的话截出来是"正在建立索引"，先等它就绪（缓存加载约 1 秒）
+                int ticks = 0;
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                timer.Tick += (_, _) =>
+                {
+                    ticks++;
+                    bool ready = _index?.Status.Ready == true || ticks >= 16;
+                    if (!ready) return;
+
+                    timer.Stop();
+                    try
+                    {
+                        window.CaptureToPng(shotPath);
+                        Log($"[shot] saved {shotPath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("[shot] failed: " + ex);
+                    }
+                    Shutdown();
+                };
+                timer.Start();
+            }));
+            return;
+        }
+
+
         // 开发/截图用：直接弹出托盘菜单（没法用脚本点托盘图标）
         if (e.Args.Contains("--tray-menu", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(() => _tray.ShowMenu());

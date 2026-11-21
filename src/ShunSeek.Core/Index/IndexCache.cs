@@ -15,7 +15,7 @@ namespace ShunSeek.Core;
 public static class IndexCache
 {
     private const int Magic = 0x53534958;   // "SSIX"
-    private const int Version = 2;
+    private const int Version = 3;
 
     public static string DefaultPath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -55,6 +55,14 @@ public static class IndexCache
             var fileRef = ReadUlongs(reader);
             var fullPath = ReadStrings(reader, count);
 
+            int friendlyCount = reader.ReadInt32();
+            var friendly = new Dictionary<int, string>(friendlyCount);
+            for (int i = 0; i < friendlyCount; i++)
+            {
+                int index = reader.ReadInt32();
+                friendly[index] = reader.ReadString();
+            }
+
             // 长度自洽检查：截断的缓存宁可丢掉也不要拿半截索引去搜
             if (nameOffset.Length != count || nameLength.Length != count ||
                 category.Length != count || fullPath.Length != count)
@@ -64,7 +72,7 @@ public static class IndexCache
                 nameArena, nameOffset, nameLength,
                 initialsArena, initialsOffset, initialsLength,
                 pinyinArena, pinyinOffset, pinyinLength,
-                category, parentRef, fileRef, fullPath);
+                category, parentRef, fileRef, fullPath, friendly);
 
             return new CachedIndex(store, scope, builtAt);
         }
@@ -106,6 +114,13 @@ public static class IndexCache
             WriteInts(writer, store.ParentRef);
             WriteUlongs(writer, store.FileRef);
             WriteStrings(writer, store.FullPath);
+
+            writer.Write(store.FriendlyNames.Count);
+            foreach (var kv in store.FriendlyNames)
+            {
+                writer.Write(kv.Key);
+                writer.Write(kv.Value);
+            }
         }
 
         System.IO.File.Move(temp, path, overwrite: true);

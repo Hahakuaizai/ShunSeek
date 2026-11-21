@@ -36,23 +36,24 @@
         <system:Double x:Key="RadiusControl">14</system:Double>
         <system:Double x:Key="RadiusTile">12</system:Double>
 
+        <!-- 纸面：暖米色，从左上到右下略微变深，像被光斜照的书页 -->
         <LinearGradientBrush x:Key="GlassFill" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FAFCFDFF" Offset="0" />
-            <GradientStop Color="#F5F3F6FA" Offset="0.55" />
-            <GradientStop Color="#F2E9EEF5" Offset="1" />
+            <GradientStop Color="#FFFBF3E2" Offset="0" />
+            <GradientStop Color="#FFF5E9D2" Offset="0.5" />
+            <GradientStop Color="#FFEDDDBF" Offset="1" />
         </LinearGradientBrush>
 
-        <!-- 边缘高光：左上最亮，中段几乎透明，右下再亮一点——玻璃的厚度感 -->
+        <!-- 纸的边：不是玻璃高光，而是压出来的浅木色毛边 -->
         <LinearGradientBrush x:Key="GlassStroke" StartPoint="0,0" EndPoint="0.7,1">
-            <GradientStop Color="#E6FFFFFF" Offset="0" />
-            <GradientStop Color="#1AFFFFFF" Offset="0.3" />
-            <GradientStop Color="#26FFFFFF" Offset="0.6" />
-            <GradientStop Color="#B3FFFFFF" Offset="1" />
+            <GradientStop Color="#FFE8D8BC" Offset="0" />
+            <GradientStop Color="#FFDCC9A8" Offset="0.5" />
+            <GradientStop Color="#FFCFB894" Offset="1" />
         </LinearGradientBrush>
 
+        <!-- 输入框：比纸面稍亮一点，像一张贴上去的便签 -->
         <LinearGradientBrush x:Key="InnerFill" StartPoint="0,0" EndPoint="0.8,1">
-            <GradientStop Color="#FAFFFFFF" Offset="0" />
-            <GradientStop Color="#E8FFFFFF" Offset="1" />
+            <GradientStop Color="#FFFFFDF7" Offset="0" />
+            <GradientStop Color="#FFFBF5E7" Offset="1" />
         </LinearGradientBrush>
 
         <LinearGradientBrush x:Key="SheenBrush" StartPoint="0,0" EndPoint="1,0">
@@ -68,7 +69,7 @@
             <Setter Property="Height" Value="34" />
             <Setter Property="Margin" Value="6,0,0,0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="#8C1D232B" />
+            <Setter Property="Foreground" Value="#8C5A4A38" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -77,10 +78,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#0F1D232B" />
+                                <Setter TargetName="Bd" Property="Background" Value="#146B4A2A" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1A1D232B" />
+                                <Setter TargetName="Bd" Property="Background" Value="#226B4A2A" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -101,11 +102,11 @@
                         </ctl:LiquidPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#0F1D232B" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#146B4A2A" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#1A1D232B" />
-                                <Setter TargetName="Bd" Property="Stroke" Value="#261D232B" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#226B4A2A" />
+                                <Setter TargetName="Bd" Property="Stroke" Value="#40A98457" />
                                 <Setter TargetName="Bd" Property="StrokeThickness" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -125,10 +126,10 @@
                         </ctl:LiquidPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#0F1D232B" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#146B4A2A" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#1A1D232B" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#226B4A2A" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -139,36 +140,49 @@
 
     <ctl:LiquidPanel x:Name="RootPanel" Radius="{StaticResource RadiusOuter}"
                      Fill="{StaticResource GlassFill}" Stroke="{StaticResource GlassStroke}">
+        <ctl:LiquidPanel.Effect>
+            <!-- 纸张压在桌面上的一层暖色投影，别太深，否则像塑料 -->
+            <DropShadowEffect BlurRadius="26" ShadowDepth="6" Direction="270"
+                              Opacity="0.22" Color="#5A3F1E" />
+        </ctl:LiquidPanel.Effect>
         <Grid>
-            <!-- 面板里的柔光斑：玻璃后面透出来的颜色倾向（参考稿那三团渐变） -->
-            <Ellipse Width="620" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top"
-                     Margin="-200,-200,0,0" IsHitTestVisible="False">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#24819BFF" Offset="0" />
-                        <GradientStop Color="#00819BFF" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-            <Ellipse Width="560" Height="460" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                     Margin="0,0,-170,-170" IsHitTestVisible="False">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#1C9C8BFF" Offset="0" />
-                        <GradientStop Color="#009C8BFF" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-
-            <!-- 极淡的冷色底：桌面太亮时，白色控件才不至于"糊"在背景里 -->
-            <Rectangle IsHitTestVisible="False">
+            <!-- 纸纤维：极淡的横向细纹，密到看不出条纹，只剩"有质感" -->
+            <Rectangle IsHitTestVisible="False" Opacity="0.28">
                 <Rectangle.Fill>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#051D232B" Offset="0" />
-                        <GradientStop Color="#0A1D232B" Offset="1" />
+                    <DrawingBrush TileMode="Tile" Viewport="0,0,7,5" ViewportUnits="Absolute"
+                                  Viewbox="0,0,7,5" ViewboxUnits="Absolute">
+                        <DrawingBrush.Drawing>
+                            <DrawingGroup>
+                                <GeometryDrawing Brush="#00FFFFFF" Geometry="M0,0 L7,0 L7,5 L0,5 Z" />
+                                <GeometryDrawing Brush="#078A6A42" Geometry="M0,1 L7,1 L7,1.6 L0,1.6 Z" />
+                                <GeometryDrawing Brush="#048A6A42" Geometry="M0,3.4 L7,3.4 L7,4 L0,4 Z" />
+                            </DrawingGroup>
+                        </DrawingBrush.Drawing>
+                    </DrawingBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <!-- 书脊：左边一条略深的竖向压痕，像一本合起来的书 -->
+            <Rectangle IsHitTestVisible="False" HorizontalAlignment="Left" Width="26">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#338A6A42" Offset="0" />
+                        <GradientStop Color="#128A6A42" Offset="0.5" />
+                        <GradientStop Color="#008A6A42" Offset="1" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
+
+            <!-- 四角轻微压暗，纸才有厚度 -->
+            <Rectangle IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#00FFFFFF" Offset="0.5" />
+                        <GradientStop Color="#128A6A42" Offset="1" />
+                    </RadialGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
 
             <Grid Background="Transparent" MouseLeftButtonDown="Root_MouseLeftButtonDown">
                 <Grid.RowDefinitions>
@@ -189,9 +203,9 @@
                     </Grid.ColumnDefinitions>
 
                     <ctl:LiquidPanel Grid.Column="0" Height="46" Radius="{StaticResource RadiusControl}"
-                                     Fill="{StaticResource InnerFill}" Stroke="#241D232B">
+                                     Fill="{StaticResource InnerFill}" Stroke="#33A98457">
                         <ctl:LiquidPanel.Effect>
-                            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Direction="270" Opacity="0.10" Color="#1D232B" />
+                            <DropShadowEffect BlurRadius="16" ShadowDepth="1" Direction="270" Opacity="0.12" Color="#7A5A32" />
                         </ctl:LiquidPanel.Effect>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -200,17 +214,17 @@
                             </Grid.ColumnDefinitions>
 
                             <ui:SymbolIcon Grid.Column="0" Symbol="Search24" FontSize="17"
-                                           Foreground="#8C1D232B" Margin="15,0,10,0" VerticalAlignment="Center" />
+                                           Foreground="#8C5A4A38" Margin="15,0,10,0" VerticalAlignment="Center" />
 
                             <Grid Grid.Column="1">
                                 <!-- Style="{x:Null}"：WPF-UI 给 TextBox 的隐式样式会画蓝色下划线，这里外面已经有玻璃壳 -->
                                 <TextBox x:Name="SearchBox" Style="{x:Null}"
                                          BorderThickness="0" Background="Transparent" Padding="0"
-                                         FontSize="15" Foreground="#1D232B" CaretBrush="#3B82F6"
+                                         FontSize="15" Foreground="#3B3027" CaretBrush="#A9713F"
                                          VerticalContentAlignment="Center" Margin="0,0,14,0"
                                          TextChanged="SearchBox_TextChanged" />
                                 <TextBlock x:Name="Placeholder" Text="搜索文件、应用、文件夹…"
-                                           FontSize="15" Foreground="#731D232B" Margin="2,0,12,0"
+                                           FontSize="15" Foreground="#8C6B5843" Margin="2,0,12,0"
                                            VerticalAlignment="Center" IsHitTestVisible="False">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -278,12 +292,12 @@
                 <!-- ② 首页标题行：已固定 N · 最近使用 M -->
                 <TextBlock Grid.Row="1" Text="{Binding HomeCaption}"
                            Visibility="{Binding HomeCaptionVisibility}"
-                           Margin="26,10,24,0" FontSize="11.5" Foreground="#8C1D232B" />
+                           Margin="26,10,24,0" FontSize="11.5" Foreground="#8C5A4A38" />
 
                 <!-- ③ 空状态：一句话，不铺东西 -->
                 <TextBlock Grid.Row="2" Text="{Binding EmptyHintText}"
                            Visibility="{Binding EmptyHintVisibility}"
-                           FontSize="13" Foreground="#661D232B"
+                           FontSize="13" Foreground="#8C7A6A58"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
 
                 <!-- ④ 搜索结果：一行一条（图标 + 名称 + 路径 + 类型），一屏能看十几条 -->
@@ -313,7 +327,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Grid Grid.Column="0" Width="26" Height="26" VerticalAlignment="Center">
-                                    <Border CornerRadius="7" Background="#141D232B"
+                                    <Border CornerRadius="7" Background="#146B4A2A"
                                             Visibility="{Binding PlaceholderVisibility}" />
                                     <Image Source="{Binding Icon}" Width="26" Height="26"
                                            Visibility="{Binding IconVisibility}"
@@ -321,33 +335,33 @@
                                 </Grid>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,12,0">
-                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#E61D232B"
+                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#E63B3027"
                                                TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Path}" FontSize="10.5" Foreground="#8C1D232B"
+                                    <TextBlock Text="{Binding Path}" FontSize="10.5" Foreground="#8C5A4A38"
                                                TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE840;" FontFamily="{StaticResource IconFont}" FontSize="10"
-                                               Foreground="#3B82F6" VerticalAlignment="Center" Margin="0,0,6,0"
+                                               Foreground="#A9713F" VerticalAlignment="Center" Margin="0,0,6,0"
                                                Visibility="{Binding PinVisibility}" />
                                     <!-- 重要级圆点 + 具体类型名（Word 文档 / Python 源码 / 文件夹…） -->
                                     <Ellipse Width="6" Height="6" Fill="{Binding ImportanceBrush}"
                                              VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <Border CornerRadius="6" Background="#0F1D232B" Padding="8,2" VerticalAlignment="Center"
+                                    <Border CornerRadius="6" Background="#146B4A2A" Padding="8,2" VerticalAlignment="Center"
                                             ToolTip="{Binding CategoryLabel}">
-                                        <TextBlock Text="{Binding TypeLabel}" FontSize="10.5" Foreground="#8C1D232B" />
+                                        <TextBlock Text="{Binding TypeLabel}" FontSize="10.5" Foreground="#8C5A4A38" />
                                     </Border>
                                 </StackPanel>
                               </Grid>
 
                               <!-- 折叠条：日志/缓存/临时文件堆成一行，点一下才展开 -->
                               <Border Visibility="{Binding GroupVisibility}" CornerRadius="8"
-                                      Background="#0A1D232B" Margin="0,3" Padding="12,0">
+                                      Background="#0F6B4A2A" Margin="0,3" Padding="12,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                   <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10"
-                                             Foreground="#8C1D232B" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                  <TextBlock Text="{Binding Name}" FontSize="11.5" Foreground="#8C1D232B"
+                                             Foreground="#8C5A4A38" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                  <TextBlock Text="{Binding Name}" FontSize="11.5" Foreground="#8C5A4A38"
                                              VerticalAlignment="Center" />
                                 </StackPanel>
                               </Border>
@@ -372,10 +386,10 @@
                          MouseDoubleClick="ResultsList_MouseDoubleClick"
                          PreviewMouseRightButtonDown="ResultsList_PreviewMouseRightButtonDown">
                     <ListBox.ItemsPanel>
-                        <!-- 首页不再限制数量，必须用能虚拟化的面板：WrapPanel 不是
-                             VirtualizingPanel，固定条目一多就会一次性生成全部磁贴、卡顿明显。 -->
+                        <!-- 首页是"收藏夹"，几十个磁贴的量级，普通 WrapPanel 足够；
+                             换成虚拟化面板反而排成一列（它按自己的尺寸模型布局）。 -->
                         <ItemsPanelTemplate>
-                            <ui:VirtualizingWrapPanel Orientation="Horizontal" />
+                            <WrapPanel Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
@@ -383,7 +397,7 @@
                             <StackPanel Width="152" ToolTip="{Binding Path}">
                                 <Grid Height="58">
                                     <Border Width="52" Height="52" CornerRadius="13"
-                                            Background="#141D232B"
+                                            Background="#146B4A2A"
                                             Visibility="{Binding PlaceholderVisibility}"
                                             HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     <Image Source="{Binding Icon}" Width="56" Height="56"
@@ -391,16 +405,16 @@
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     <Border Width="18" Height="18" CornerRadius="9"
-                                            Background="#F2FFFFFF" BorderBrush="#331D232B" BorderThickness="1"
+                                            Background="#FBF4E6" BorderBrush="#40A98457" BorderThickness="1"
                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,10,0"
                                             Visibility="{Binding PinVisibility}">
                                         <TextBlock Text="&#xE840;" FontFamily="{StaticResource IconFont}"
-                                                   FontSize="9" Foreground="#3B82F6"
+                                                   FontSize="9" Foreground="#A9713F"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
                                 </Grid>
                                 <TextBlock Text="{Binding Name}"
-                                           FontSize="12.5" Foreground="#E61D232B"
+                                           FontSize="12.5" Foreground="#E63B3027"
                                            TextAlignment="Center" TextTrimming="CharacterEllipsis"
                                            Margin="0,7,0,0" />
                             </StackPanel>
@@ -410,14 +424,14 @@
 
                 <!-- ⑥ 底栏 -->
                 <Grid Grid.Row="3" Margin="24,6,20,12">
-                    <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="#731D232B"
+                    <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="#8C6B5843"
                                VerticalAlignment="Center" HorizontalAlignment="Left"
                                TextTrimming="CharacterEllipsis" MaxWidth="300" />
-                    <TextBlock Text="{Binding ResultText}" FontSize="11.5" Foreground="#8C1D232B"
+                    <TextBlock Text="{Binding ResultText}" FontSize="11.5" Foreground="#8C5A4A38"
                                VerticalAlignment="Center" HorizontalAlignment="Center" />
 
                     <Button x:Name="SettingsButton" HorizontalAlignment="Right" Click="SettingsButton_Click"
-                            Cursor="Hand" Foreground="#8C1D232B">
+                            Cursor="Hand" Foreground="#8C5A4A38">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="Bd" CornerRadius="10" Padding="9,5" Background="Transparent">
@@ -429,7 +443,7 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#0F1D232B" />
+                                        <Setter TargetName="Bd" Property="Background" Value="#146B4A2A" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -438,43 +452,19 @@
                 </Grid>
             </Grid>
 
-            <!-- 顶部内高光：贴着上边缘的一条白线，玻璃才有厚度 -->
+            <!-- 上边缘一道极淡的亮边：纸被压在桌面上时的那条高光 -->
             <Rectangle Height="1" VerticalAlignment="Top" IsHitTestVisible="False" Margin="34,1,34,0"
                        RadiusX="1" RadiusY="1">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#00FFFFFF" Offset="0" />
-                        <GradientStop Color="#CCFFFFFF" Offset="0.28" />
-                        <GradientStop Color="#CCFFFFFF" Offset="0.72" />
-                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                        <GradientStop Color="#00FFFDF6" Offset="0" />
+                        <GradientStop Color="#99FFFDF6" Offset="0.3" />
+                        <GradientStop Color="#99FFFDF6" Offset="0.7" />
+                        <GradientStop Color="#00FFFDF6" Offset="1" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
 
-            <!-- 液态流动高光：一条斜着的白色渐变，8 秒扫一趟（参考稿的 liquid 动画） -->
-            <Rectangle Width="300" IsHitTestVisible="False" Opacity="0.3"
-                       Fill="{StaticResource SheenBrush}" HorizontalAlignment="Left">
-                <Rectangle.RenderTransform>
-                    <TransformGroup>
-                        <RotateTransform Angle="20" />
-                        <TranslateTransform X="-620" Y="-140" />
-                    </TransformGroup>
-                </Rectangle.RenderTransform>
-                <Rectangle.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimationUsingKeyFrames
-                                        Storyboard.TargetProperty="RenderTransform.Children[1].X">
-                                    <LinearDoubleKeyFrame KeyTime="0:0:0" Value="-620" />
-                                    <LinearDoubleKeyFrame KeyTime="0:0:4.2" Value="880" />
-                                    <LinearDoubleKeyFrame KeyTime="0:0:8" Value="880" />
-                                </DoubleAnimationUsingKeyFrames>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </Rectangle.Triggers>
-            </Rectangle>
         </Grid>
     </ctl:LiquidPanel>
 </ui:FluentWindow>

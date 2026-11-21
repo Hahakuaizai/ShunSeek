@@ -20,12 +20,12 @@ public sealed class TrayMenu
     private static readonly System.Windows.Media.FontFamily IconFont =
         new("Segoe Fluent Icons, Segoe MDL2 Assets");
 
-    private static readonly Brush IconBrush = new SolidColorBrush(Color.FromRgb(0x5A, 0x63, 0x72));
-    private static readonly Brush TextBrush = new SolidColorBrush(Color.FromRgb(0x1D, 0x23, 0x2B));
-    private static readonly Brush HintBrush = new SolidColorBrush(Color.FromRgb(0x9A, 0xA3, 0xAF));
-    private static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xC4, 0x2B, 0x1C));
-    private static readonly Brush HoverBrush = new SolidColorBrush(Color.FromArgb(0x14, 0x1D, 0x23, 0x2B));
-    private static readonly Brush PressedBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x1D, 0x23, 0x2B));
+    private static readonly Brush IconBrush = new SolidColorBrush(Color.FromRgb(0x8A, 0x6A, 0x42));
+    private static readonly Brush TextBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x30, 0x27));
+    private static readonly Brush HintBrush = new SolidColorBrush(Color.FromRgb(0xA9, 0x97, 0x7E));
+    private static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xB4, 0x3A, 0x1E));
+    private static readonly Brush HoverBrush = new SolidColorBrush(Color.FromArgb(0x18, 0x6B, 0x4A, 0x2A));
+    private static readonly Brush PressedBrush = new SolidColorBrush(Color.FromArgb(0x28, 0x6B, 0x4A, 0x2A));
 
     private readonly Popup _popup;
     private System.Windows.Window? _owner;
@@ -44,17 +44,17 @@ public sealed class TrayMenu
             Fill = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new GradientStop(Color.FromArgb(0xFC, 0xFD, 0xFE, 0xFF), 0),
-                    new GradientStop(Color.FromArgb(0xF8, 0xF4, 0xF7, 0xFA), 0.55),
-                    new GradientStop(Color.FromArgb(0xF5, 0xEC, 0xF0, 0xF6), 1),
+                    new GradientStop(Color.FromArgb(0xFF, 0xFD, 0xF8, 0xEC), 0),
+                    new GradientStop(Color.FromArgb(0xFF, 0xF8, 0xF0, 0xDF), 0.55),
+                    new GradientStop(Color.FromArgb(0xFF, 0xF2, 0xE7, 0xD2), 1),
                 },
                 new Point(0, 0), new Point(1, 1)),
             Stroke = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new GradientStop(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF), 0),
-                    new GradientStop(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF), 0.35),
-                    new GradientStop(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF), 1),
+                    new GradientStop(Color.FromArgb(0xFF, 0xE8, 0xD8, 0xBC), 0),
+                    new GradientStop(Color.FromArgb(0xFF, 0xDC, 0xC9, 0xA8), 0.5),
+                    new GradientStop(Color.FromArgb(0xFF, 0xCF, 0xB8, 0x94), 1),
                 },
                 new Point(0, 0), new Point(0.7, 1)),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -62,8 +62,8 @@ public sealed class TrayMenu
                 BlurRadius = 26,
                 ShadowDepth = 5,
                 Direction = 270,
-                Opacity = 0.18,
-                Color = Color.FromRgb(0x1D, 0x23, 0x2B),
+                Opacity = 0.20,
+                Color = Color.FromRgb(0x7A, 0x5A, 0x32),
             },
         };
 

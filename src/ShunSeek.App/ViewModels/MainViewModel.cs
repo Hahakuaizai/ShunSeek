@@ -13,7 +13,19 @@ public sealed class ResultItemViewModel : INotifyPropertyChanged
 {
     private ImageSource? _icon;
 
-    public required string Name { get; init; }
+    private string _name = string.Empty;
+
+    /// <summary>显示名。构造时给文件名，随后可能被 Shell 的本地化名字替换（Desktop → 桌面）。</summary>
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            if (_name == value) return;
+            _name = value;
+            OnPropertyChanged();
+        }
+    }
     public required string Path { get; init; }
     public required string CategoryLabel { get; init; }
 
@@ -485,17 +497,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!item.HasPath) return;
 
         var cached = _icons.TryGet(item.Path, item.Category);
-        if (cached != null)
-        {
-            item.Icon = cached;
-            return;
-        }
+        if (cached != null) item.Icon = cached;
 
+        // 显示名同理：Shell 可能要读文件属性，一律放到后台
         _ = Task.Run(async () =>
         {
-            var icon = await _icons.GetAsync(item.Path, item.Category).ConfigureAwait(false);
-            if (icon == null) return;
-            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => item.Icon = icon);
+            var icon = cached ?? await _icons.GetAsync(item.Path, item.Category).ConfigureAwait(false);
+            var name = ShellNames.Resolve(item.Path, item.IsDirectory);
+
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+            {
+                if (icon != null) item.Icon = icon;
+                if (name != null) item.Name = name;
+            });
         });
     }
 
@@ -551,14 +565,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         };
     }
 
-    /// <summary>重要级标识色：高=主题蓝，普通=中灰，低=浅灰。</summary>
+    /// <summary>重要级标识色：高=木色（和纸质主题同一套），普通=暖灰，低=浅米。</summary>
     private static System.Windows.Media.Brush ImportanceBrushOf(TypeImportance importance)
     {
         var hex = importance switch
         {
-            TypeImportance.High => "#3B82F6",
-            TypeImportance.Normal => "#8A9099",
-            _ => "#C2C7CE",
+            TypeImportance.High => "#A9713F",
+            TypeImportance.Normal => "#9C8B77",
+            _ => "#CBBBA4",
         };
         var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
         brush.Freeze();

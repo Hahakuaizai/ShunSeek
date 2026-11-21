@@ -38,13 +38,21 @@ public sealed class IndexStore
     // 没必要为 44 万条各存一份重复的短名字符串。
     public string[] FullPath { get; private init; } = Array.Empty<string>();
 
+    /// <summary>
+    /// 显示名与文件名不一致的条目（微信 → E:\Weixin\Weixin.exe、微信输入法 → wetype_server.exe…）。
+    /// 只给这几千条应用/快捷方式存一份，普通文件一律用文件名，不占内存。
+    /// </summary>
+    public IReadOnlyDictionary<int, string> FriendlyNames { get; private init; } =
+        new Dictionary<int, string>();
+
     /// <summary>给缓存恢复用：直接从现成数组装配一个只读索引，不做任何转换。</summary>
     internal static IndexStore FromArrays(
         char[] nameArena, int[] nameOffset, int[] nameLength,
         char[] initialsArena, int[] initialsOffset, int[] initialsLength,
         char[] pinyinArena, int[] pinyinOffset, int[] pinyinLength,
         byte[] category, int[] parentRef, ulong[] fileRef,
-        string[] fullPath)
+        string[] fullPath,
+        IReadOnlyDictionary<int, string>? friendlyNames = null)
         => new()
         {
             Count = fullPath.Length,
@@ -53,6 +61,7 @@ public sealed class IndexStore
             PinyinArena = pinyinArena, PinyinOffset = pinyinOffset, PinyinLength = pinyinLength,
             Category = category, ParentRef = parentRef, FileRef = fileRef,
             FullPath = fullPath,
+            FriendlyNames = friendlyNames ?? new Dictionary<int, string>(),
         };
 
     public ReadOnlySpan<char> LowerName(int i) => NameArena.AsSpan(NameOffset[i], NameLength[i]);
@@ -67,8 +76,10 @@ public sealed class IndexStore
         ? LowerName(i)
         : PinyinArena.AsSpan(PinyinOffset[i], PinyinLength[i]);
 
-    /// <summary>显示名：全路径的文件名部分。</summary>
-    public string NameOf(int i) => System.IO.Path.GetFileName(FullPath[i]);
+    /// <summary>显示名：优先用注册表/快捷方式给的友好名，否则取文件名。</summary>
+    public string NameOf(int i) => FriendlyNames.TryGetValue(i, out var friendly)
+        ? friendly
+        : System.IO.Path.GetFileName(FullPath[i]);
     public EntryCategory CategoryOf(int i) => (EntryCategory)Category[i];
 
     /// <summary>索引内存粗估（字节），给 Bench 和诊断页用：数组实际占用 + string 估算。</summary>
@@ -94,6 +105,7 @@ public sealed class IndexStore
         private readonly List<int> _parent = new();
         private readonly List<ulong> _refs = new();
         private readonly List<string> _path = new();
+        private readonly Dictionary<int, string> _friendly = new();
 
         public int Count => _path.Count;
 
@@ -123,6 +135,11 @@ public sealed class IndexStore
             _parent.Add(parentIndex);
             _refs.Add(fileRef);
             _path.Add(fullPath);
+
+            // 名字和文件名不一样才有必要单独记（应用注册表名、快捷方式名）
+            var leaf = System.IO.Path.GetFileName(fullPath);
+            if (!string.Equals(displayName, leaf, StringComparison.Ordinal))
+                _friendly[_path.Count - 1] = displayName;
         }
 
         public IndexStore Freeze()
@@ -143,6 +160,7 @@ public sealed class IndexStore
                 ParentRef = CopyInts(_parent),
                 FileRef = CopyUlongs(_refs),
                 FullPath = _path.ToArray(),
+                FriendlyNames = new Dictionary<int, string>(_friendly),
             };
 
             // 构建期的 List 全是几 MB~几十 MB 的底层数组，Freeze 之后就没用了。
@@ -168,6 +186,7 @@ public sealed class IndexStore
             _parent.Clear(); _parent.TrimExcess();
             _refs.Clear(); _refs.TrimExcess();
             _path.Clear(); _path.TrimExcess();
+            _friendly.Clear();
         }
 
         // ToArray() 在 List 内部会先 EnsureCapacity(count)（容量可能已经是 2 倍），
