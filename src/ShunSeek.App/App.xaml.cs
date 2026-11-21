@@ -109,7 +109,7 @@ public partial class App : System.Windows.Application
     /// 以管理员身份重启：MFT 直读全盘要读卷句柄，普通权限打不开。
     /// 提权后启动的是同一个 exe（UAC 会弹确认框），索引范围从"用户目录"升级成"全盘"。
     /// </summary>
-    private void RestartElevated()
+    internal void RestartElevated()
     {
         try
         {

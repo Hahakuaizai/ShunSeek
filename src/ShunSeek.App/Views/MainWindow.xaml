@@ -1,0 +1,235 @@
+<ui:FluentWindow x:Class="ShunSeek.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="瞬觅 ShunSeek"
+        Width="700" Height="500"
+        WindowStartupLocation="Manual"
+        WindowBackdropType="Mica"
+        ExtendsContentIntoTitleBar="True"
+        WindowCornerPreference="Round"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True">
+
+    <!-- 布局照 Win11 开始菜单的"所有应用"来：顶上一条搜索框，下面是一格格图标，
+         不再把十几个类型标签横着堆一排（700 宽根本放不下，还会被裁掉）。
+         颜色全部按浅色主题写死：Mica 背景透出桌面壁纸，磁贴用极淡的黑色蒙层表示悬停/选中。 -->
+    <ui:FluentWindow.Resources>
+        <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- 顶栏/底栏的小圆角图标按钮 -->
+        <Style x:Key="ToolButton" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="#8C000000" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="9" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#18000000" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#26000000" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 磁贴：图标 + 名字，悬停/选中是一层很淡的圆角蒙层 -->
+        <Style x:Key="TileItem" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" CornerRadius="12" Background="Transparent" Padding="4,6">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#12000000" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1F000000" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ① 搜索栏 + 筛选 + 关闭 -->
+        <Grid Grid.Row="0" Margin="20,18,16,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Height="46" CornerRadius="10"
+                    Background="#D9FFFFFF" BorderBrush="#1F000000" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon Grid.Column="0" Symbol="Search24" FontSize="17"
+                                   Foreground="#73000000" Margin="14,0,10,0" VerticalAlignment="Center" />
+
+                    <Grid Grid.Column="1">
+                        <!-- Style="{x:Null}"：WPF-UI 给 TextBox 的隐式样式会画一条蓝色下划线，
+                             这里外面已经有圆角输入框了，不要它那套外壳。 -->
+                        <TextBox x:Name="SearchBox" Style="{x:Null}"
+                                 BorderThickness="0" Background="Transparent" Padding="0"
+                                 FontSize="15" Foreground="#1A1A1A" CaretBrush="#2563EB"
+                                 VerticalContentAlignment="Center" Margin="0,0,12,0"
+                                 TextChanged="SearchBox_TextChanged" />
+                        <TextBlock x:Name="Placeholder" Text="搜索文件、应用、文件夹…"
+                                   FontSize="15" Foreground="#8C000000" Margin="2,0,12,0"
+                                   VerticalAlignment="Center" IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 类型筛选：一个漏斗按钮 + 下拉，别再占一整排 -->
+            <Button Grid.Column="1" x:Name="FilterButton" Style="{StaticResource ToolButton}"
+                    Click="FilterButton_Click" ToolTip="按类型筛选">
+                <Button.ContextMenu>
+                    <!-- 多级菜单：类型先分组，再选具体项，不用一次列十几行 -->
+                    <ContextMenu>
+                        <MenuItem Header="全部" Tag="" IsCheckable="True" IsChecked="True" Click="FilterMenu_Click" />
+                        <Separator />
+                        <MenuItem Header="应用程序">
+                            <MenuItem Header="软件" Tag="App" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="快捷方式" Tag="Shortcut" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="安装目录" Tag="InstallDir" IsCheckable="True" Click="FilterMenu_Click" />
+                        </MenuItem>
+                        <MenuItem Header="文件">
+                            <MenuItem Header="文档" Tag="Document" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="图片" Tag="Image" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="视频" Tag="Video" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="音频" Tag="Audio" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="压缩包" Tag="Archive" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="代码" Tag="Code" IsCheckable="True" Click="FilterMenu_Click" />
+                            <MenuItem Header="程序" Tag="Executable" IsCheckable="True" Click="FilterMenu_Click" />
+                        </MenuItem>
+                        <MenuItem Header="文件夹" Tag="Folder" IsCheckable="True" Click="FilterMenu_Click" />
+                        <MenuItem Header="其他" Tag="Other" IsCheckable="True" Click="FilterMenu_Click" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="15" />
+            </Button>
+
+            <Button Grid.Column="2" Style="{StaticResource ToolButton}"
+                    Click="CloseButton_Click" ToolTip="关闭 (Esc)">
+                <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="13" />
+            </Button>
+        </Grid>
+
+        <!-- ② 空状态：只在什么都没有的时候出现，一句话就够 -->
+        <TextBlock Grid.Row="1" Text="{Binding EmptyHintText}"
+                   Visibility="{Binding EmptyHintVisibility}"
+                   FontSize="13" Foreground="#73000000"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+
+        <!-- ③ 图标网格（虚拟化 + 回收：几千条也不会卡） -->
+        <ListBox x:Name="ResultsList"
+                 Grid.Row="1"
+                 Margin="16,8,10,0"
+                 ItemsSource="{Binding Results}"
+                 ItemContainerStyle="{StaticResource TileItem}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling"
+                 MouseDoubleClick="ResultsList_MouseDoubleClick">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Width="152" ToolTip="{Binding Path}">
+                        <!-- 图标位：系统原版图标（文件夹就是 Windows 那个文件夹）。
+                             图标是异步取的，没到之前只放一块很淡的圆角占位，不画字、不上色。 -->
+                        <Grid Height="58">
+                            <Border Width="52" Height="52" CornerRadius="10"
+                                    Background="#0F000000"
+                                    Visibility="{Binding PlaceholderVisibility}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Image Source="{Binding Icon}" Width="54" Height="54"
+                                   Visibility="{Binding IconVisibility}"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Text="{Binding Name}"
+                                   FontSize="12" Foreground="#CC000000"
+                                   TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                                   Margin="0,7,0,0" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- ④ 底栏：左边索引状态，中间本次查询耗时，右边设置 -->
+        <Grid Grid.Row="2" Margin="20,6,16,10">
+            <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="#7A000000"
+                       VerticalAlignment="Center" HorizontalAlignment="Left"
+                       TextTrimming="CharacterEllipsis" MaxWidth="300" />
+            <TextBlock Text="{Binding ResultText}" FontSize="11.5" Foreground="#5A5A5A"
+                       VerticalAlignment="Center" HorizontalAlignment="Center" />
+
+            <Button x:Name="SettingsButton" HorizontalAlignment="Right" Click="SettingsButton_Click"
+                    Cursor="Hand" Foreground="#7A000000">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="9" Padding="8,5" Background="Transparent">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock Text="打开设置" FontSize="12" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#18000000" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

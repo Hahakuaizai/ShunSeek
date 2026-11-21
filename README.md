@@ -11,30 +11,39 @@
 
 ```
 ShunSeek.sln
-├─ src/ShunSeek.Core/     搜索引擎（net8.0，无 UI 依赖）
-│  ├─ IndexStore          平坦内存索引：char 池 + 并行数组，缓存友好、可并行扫描
-│  ├─ SearchIndex         一次搜索看到的快照 = 基础索引 + 增量索引 + 墓碑（不可变，可并发读）
-│  ├─ SearchEngine        分片并行 Span.IndexOf 扫描 + 打分排序 + 取消；支持原子换快照
-│  ├─ DeltaIndex          增量表：新增/改名进小表，删除记墓碑，攒多了请求重建
-│  ├─ IndexService        建索引 → 增量监听 → 必要时重建，整条链路的状态机（UI 只订阅状态）
-│  ├─ IndexBuilder        多数据源汇总 + MFT 父链拼路径 + 目录引用号表
-│  ├─ PinyinInitials      拼音首字母（GB2312 边界字表法），"wzry" → 王者荣耀
-│  ├─ CategoryClassifier  按扩展名分类（图片/视频/音频/文档/压缩包/代码…）
-│  ├─ UsageStore          打开频次（JSON 落盘），排序加分 + "最近使用"列表
-│  └─ Sources/
-│     ├─ MftEnumerator    FSCTL_ENUM_USN_DATA 直读 MFT（+ MftIndexSource 拼全路径）
-│     ├─ UsnWatcher       FSCTL_READ_USN_JOURNAL 增量监听（阻塞读、日志覆盖时抛异常）
-│     ├─ DirectoryUpdateWatcher  FileSystemWatcher 兜底增量（便携模式/非 NTFS）
-│     ├─ AppScanner       开始菜单/桌面快捷方式 + 注册表 Uninstall（软件/安装目录/启动路径）
-│     └─ DirectoryWalker  非 NTFS/无权限时的兜底遍历
-├─ src/ShunSeek.Bench/    速度基准：合成 200 万条目 → 建索引 → 跑查询集
-├─ src/ShunSeek.App/      WPF + WPF-UI 界面壳（FluentWindow + Mica + 热键 + 托盘）
-├─ scripts/               启动脚本（自动找 dotnet、编译、起进程）
-│  ├─ run.ps1             pwsh 7 脚本，主入口
-│  └─ run.cmd             双击用的小壳子（转给 run.ps1）
+├─ src/ShunSeek.Core/            搜索引擎（net8.0，无 UI 依赖）
+│  ├─ Search/                    查询侧
+│  │  ├─ SearchIndex             一次搜索看到的快照 = 基础 + 增量 + 墓碑（不可变，可并发读）
+│  │  ├─ SearchEngine            分片并行 Span.IndexOf 扫描 + 打分排序 + 原子换快照
+│  │  ├─ PinyinInitials          拼音首字母（GB2312 边界字表法），"wzry" → 王者荣耀
+│  │  ├─ CategoryClassifier      按扩展名分类（图片/视频/音频/文档/压缩包/代码…）
+│  │  ├─ EntryCategory           分类枚举与中文名
+│  │  ├─ RawEntry / IIndexSource 数据源与索引之间的契约
+│  ├─ Index/                     索引侧
+│  │  ├─ IndexStore              平坦内存索引：char 池 + 并行数组
+│  │  ├─ IndexBuilder            多源汇总 + MFT 父链拼路径 + 目录引用号表
+│  │  ├─ DeltaIndex              增量表：新增/改名进小表，删除记墓碑
+│  │  ├─ IndexService            建索引 → 增量监听 → 必要时重建（UI 只订阅状态）
+│  │  └─ UsageStore              打开频次（JSON 落盘）+ "最近使用"
+│  └─ Sources/                   数据来源
+│     ├─ MftEnumerator           FSCTL_ENUM_USN_DATA 直读 MFT
+│     ├─ UsnWatcher              FSCTL_READ_USN_JOURNAL 增量监听
+│     ├─ DirectoryUpdateWatcher  FileSystemWatcher 兜底增量
+│     ├─ AppScanner              开始菜单/桌面快捷方式 + 注册表 Uninstall
+│     └─ DirectoryWalker         非 NTFS/无权限时的兜底遍历
+├─ src/ShunSeek.Bench/           速度基准：合成 200 万条目 → 建索引 → 跑查询集
+├─ src/ShunSeek.App/             WPF 界面壳
+│  ├─ App.xaml(.cs)              单实例、托盘、热键、崩溃日志
+│  ├─ Views/                     MainWindow（图标网格 + 搜索栏）
+│  ├─ ViewModels/                MainViewModel（结果、状态、异步图标）
+│  ├─ Services/                  IconCache / HotkeyManager / TrayIconManager
+│  └─ GlobalUsings.cs            WPF 与 WinForms 同名类型的别名
+├─ scripts/                      启动脚本
+│  ├─ run.ps1                    pwsh 7 脚本，主入口
+│  └─ run.cmd                    双击用的小壳子（转给 run.ps1）
 └─ docs/
-   ├─ 开发流程.md         分 6 阶段的开发指导（目标/任务/验收/坑）
-   └─ ui-mockup.html      弹窗 UI 目标稿，浏览器打开对着调 XAML
+   ├─ 开发流程.md                分 6 阶段的开发指导
+   └─ ui-mockup.html             弹窗 UI 目标稿
 ```
 
 ## 跑起来
@@ -46,11 +55,22 @@ pwsh -File .\run.ps1 -Release   # Release
 pwsh -File .\run.ps1 -Bench     # 只跑速度基准
 ```
 
-双击 `scriptsun.cmd` 等价于 `scriptsun.ps1`。脚本会自动找 dotnet（PATH → `%ProgramFiles%\dotnet` →
+双击 `scripts
+un.cmd` 等价于 `scripts
+un.ps1`。脚本会自动找 dotnet（PATH → `%ProgramFiles%\dotnet` →
 `%USERPROFILE%\.dotnet`），并给子进程补 `DOTNET_ROOT`——dotnet-install 装在用户目录的 SDK
 没登记进系统环境变量，不补这个，双击 exe 会报 "You must install .NET"。
 
 在 VS 2022 里直接 F5 也行（.NET 桌面开发工作负载 + 自动还原 WPF-UI）。
+
+### 界面
+
+- 一屏就是"搜索框 + 图标网格"：图标全部取系统原版（文件夹就是 Windows 的文件夹，
+  程序就是它自己的图标），取不到时只放一块淡占位，不画色块不写字。
+- 第一屏只放最近打开过的 8 条；什么都没有就一句提示，不把整盘东西铺上来。
+- 类型筛选收进漏斗按钮里的**多级菜单**：应用程序（软件/快捷方式/安装目录）、
+  文件（文档/图片/视频/音频/压缩包/代码/程序）、文件夹、其他。
+- 键盘：↑↓←→ 走格子、Enter 打开、Ctrl+Enter 定位、Ctrl+C 复制路径、Esc 收起。
 
 ### 两种索引档位
 
