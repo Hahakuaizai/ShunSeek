@@ -105,7 +105,7 @@ public sealed class SearchIndex
                         if (matchAt < 0) continue;
                         if (IsBaseDead(i)) continue; // 墓碑：已删除的条目，命中也不返回
 
-                        local.Add(new SearchHit(i, Score(store, i, matchAt, viaInitials, boost), matchAt, viaInitials));
+                        local.Add(new SearchHit(i, Score(store, i, qSpan, matchAt, viaInitials, boost), matchAt, viaInitials));
 
                         // 防爆：某分区命中过多（如搜 "a"）时先排序截断，避免内存与排序成本失控
                         if (local.Count >= 16384)
@@ -142,7 +142,7 @@ public sealed class SearchIndex
                 }
                 if (matchAt < 0) continue;
                 local.Add(new SearchHit(
-                    baseCount + i, Score(store, i, matchAt, viaInitials, boost), matchAt, viaInitials));
+                    baseCount + i, Score(store, i, qSpan, matchAt, viaInitials, boost), matchAt, viaInitials));
             }
         }
 
@@ -183,6 +183,9 @@ public sealed class SearchIndex
                             _ => 0f,
                         };
                         if (store.DisplayName[i].Length <= 6) score += 8f; // 短名优先，和名字通道一致
+                        // 全拼正好等于查询串（weixin → 微信）：和名字精确命中同等对待
+                        if (matchAt == 0 && store.PinyinLength[i] == qSpan.Length) score += 30f;
+                        score += PathPenalty(store.FullPath[i]);
                         if (boost != null) score += boost(store.FullPath[i]);
                         local.Add(new SearchHit(i, score, matchAt, false, true));
                     }
@@ -243,7 +246,8 @@ public sealed class SearchIndex
         return false;
     }
 
-    private static float Score(IndexStore store, int index, int matchAt, bool viaInitials, Func<string, float>? boost)
+    private static float Score(
+        IndexStore store, int index, ReadOnlySpan<char> query, int matchAt, bool viaInitials, Func<string, float>? boost)
     {
         var name = store.LowerName(index);
         float score;
@@ -279,6 +283,11 @@ public sealed class SearchIndex
         // 短名优先："微信" 该压过 "wx1c36464bbee2507a"
         if (name.Length <= 6) score += 8f;
 
+        // 整个名字就是查询串（输入"微信"命中"微信"）：这是最确定的一次命中
+        if (!viaInitials && matchAt == 0 && name.Length == query.Length) score += 30f;
+
+        score += PathPenalty(store.FullPath[index]);
+
         // 哈希样式的名字基本是缓存/临时目录，压下去
         if (LooksLikeHash(name)) score -= 30f;
 
@@ -289,6 +298,26 @@ public sealed class SearchIndex
     }
 
     private static bool IsCjk(char c) => c is >= (char)0x4E00 and <= (char)0x9FFF;
+
+    /// <summary>
+    /// 路径本身也在说话：越深越可能是缓存/临时产物，AppData 下面大多是配置和缓存。
+    /// 都是小额度减分——够把同分的一堆结果里的"真东西"顶上来，又不至于改变命中档位。
+    /// </summary>
+    private static float PathPenalty(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return 0f;
+
+        float penalty = 0f;
+        int depth = 0;
+        foreach (var c in path)
+            if (c == '\\') depth++;
+
+        if (depth > 3) penalty -= Math.Min(15f, (depth - 3) * 3f);
+
+        if (path.Contains("\\AppData\\", StringComparison.OrdinalIgnoreCase)) penalty -= 6f;
+        if (path.Contains("\\$Recycle.Bin\\", StringComparison.OrdinalIgnoreCase)) penalty -= 10f;
+        return penalty;
+    }
 
     /// <summary>像哈希的名字：长度 ≥ 8、只含 0-9a-f，且至少有一个数字。</summary>
     private static bool LooksLikeHash(ReadOnlySpan<char> name)
