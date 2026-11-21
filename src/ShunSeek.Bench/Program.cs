@@ -43,7 +43,7 @@ static void RunQuery(SearchEngine engine, string query, EntryCategory? category)
     var label = category.HasValue ? $"{query} [{EntryCategoryNames.DisplayName(category.Value)}]" : query;
     Console.WriteLine($"查询 \"{label}\": 首次 {times[0]:F1} ms, 平均 {times.Skip(1).Average():F1} ms, 返回 {hits.Count} 条");
     foreach (var h in hits.Take(3))
-        Console.WriteLine($"    · {engine.Store.DisplayName[h.Index]}  [{EntryCategoryNames.DisplayName(engine.Store.CategoryOf(h.Index))}]  {engine.Store.FullPath[h.Index]}");
+        Console.WriteLine($"    · {engine.Store.NameOf(h.Index)}  [{EntryCategoryNames.DisplayName(engine.Store.CategoryOf(h.Index))}]  {engine.Store.FullPath[h.Index]}");
 }
 
 static List<RawEntry> Generate(int count)

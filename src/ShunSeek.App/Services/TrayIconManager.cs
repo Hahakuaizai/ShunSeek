@@ -13,27 +13,19 @@ public sealed class TrayIconManager : IDisposable
 {
     private readonly NotifyIcon _icon;
 
+    private readonly Action _onToggle;
+    private readonly Action _onRefresh;
+    private readonly Action _onRebuild;
+    private readonly Action _onRestartElevated;
+    private readonly Action _onExit;
+
     public TrayIconManager(Action onToggle, Action onRefresh, Action onRebuild, Action onRestartElevated, Action onExit)
     {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("显示搜索 (Alt+Space)", null, (_, _) => onToggle());
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("立即刷新索引", null, (_, _) => onRefresh());
-        menu.Items.Add("重建索引", null, (_, _) => onRebuild());
-        // 便携模式只索引用户目录；要全盘（MFT 直读，几秒建完）得提权跑
-        menu.Items.Add("以管理员身份重启（全盘索引）", null, (_, _) => onRestartElevated());
-        menu.Items.Add(new ToolStripSeparator());
-
-        var autoStart = new ToolStripMenuItem("开机自启")
-        {
-            CheckOnClick = true,
-            Checked = StartupRegistration.IsEnabled(),
-        };
-        autoStart.CheckedChanged += (_, _) => StartupRegistration.Set(autoStart.Checked);
-        menu.Items.Add(autoStart);
-
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("退出", null, (_, _) => onExit());
+        _onToggle = onToggle;
+        _onRefresh = onRefresh;
+        _onRebuild = onRebuild;
+        _onRestartElevated = onRestartElevated;
+        _onExit = onExit;
 
         var appIcon = LoadAppIcon();
         App.Log("tray icon: " + (appIcon == null ? "fallback(系统默认)" : "loaded(" + appIcon.Width + "px)"));
@@ -42,12 +34,35 @@ public sealed class TrayIconManager : IDisposable
         {
             Text = "瞬觅 ShunSeek", // 注意 NotifyIcon.Text 上限 63 字符
             Icon = appIcon ?? System.Drawing.SystemIcons.Application,
-            ContextMenuStrip = menu,
             Visible = true,
         };
-        _icon.DoubleClick += (_, _) => onToggle();
+
+        // 不再用 WinForms 的 ContextMenuStrip（系统默认灰白样式，和主界面不是一套语言），
+        // 右键改成弹我们自己的玻璃菜单；左键直接呼出搜索窗。
+        _icon.MouseUp += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right) ShowMenu();
+            else if (e.Button == MouseButtons.Left) onToggle();
+        };
 
         ShowTrayHintOnce();
+    }
+
+    /// <summary>在鼠标位置弹出玻璃风格菜单。</summary>
+    public void ShowMenu()
+    {
+        var menu = new TrayMenu()
+            .AddItem("", "显示搜索", _onToggle, hint: "Alt+Space")
+            .AddSeparator()
+            .AddItem("", "立即刷新索引", _onRefresh)
+            .AddItem("", "重建索引", _onRebuild)
+            .AddItem("", "以管理员身份重启", _onRestartElevated, hint: "全盘索引")
+            .AddSeparator()
+            .AddToggle("开机自启", StartupRegistration.IsEnabled(), StartupRegistration.Set)
+            .AddSeparator()
+            .AddItem("", "退出", _onExit, danger: true);
+
+        menu.ShowAtCursor(System.Windows.Application.Current?.MainWindow);
     }
 
     /// <summary>

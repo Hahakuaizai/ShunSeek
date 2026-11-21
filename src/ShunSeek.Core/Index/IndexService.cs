@@ -119,6 +119,7 @@ public sealed class IndexService : IDisposable
 
         Engine.Swap(new SearchIndex(_base, IndexStore.Empty, null, null, null));
         StartWatchers();
+        CompactLargeHeap("缓存加载后");
 
         var age = DateTime.Now - cached.BuiltAt;
         bool stale = age > TimeSpan.FromHours(24);
@@ -171,6 +172,32 @@ public sealed class IndexService : IDisposable
     private void AppLog(string message) => Log?.Invoke(message);
 
     /// <summary>
+    /// 索引是几块几十 MB 的大数组，天生落在大对象堆（LOH）上，LOH 默认不压缩，
+    /// 反复重建几次就会留下大量空洞——任务管理器里看着就是"这软件怎么吃几百兆"。
+    /// 每次换完大索引手动压一次，内存能立刻还回去。
+    /// </summary>
+    private void CompactLargeHeap(string when)
+    {
+        try
+        {
+            var before = GC.GetTotalMemory(forceFullCollection: false);
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+                System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+
+            long managed = GC.GetTotalMemory(forceFullCollection: false);
+            long estimate = _base.EstimateMemoryBytes();
+            AppLog($"[mem] {when}: managed={managed / 1024 / 1024}MB " +
+                   $"(before={before / 1024 / 1024}MB) index≈{estimate / 1024 / 1024}MB " +
+                   $"entries={_base.Count:N0}");
+        }
+        catch
+        {
+            // 诊断/优化失败不能影响搜索
+        }
+    }
+
+    /// <summary>
     /// 整表重建：重新读 MFT / 遍历目录，建好后原子换掉搜索快照。
     /// 重建期间搜索照常可用（用的是旧快照），只是结果里暂时没有最新变化。
     /// </summary>
@@ -216,6 +243,7 @@ public sealed class IndexService : IDisposable
                 LastBuildAt: _lastBuildAt, LastUpdateAt: _lastUpdateAt));
 
             SaveCache();
+            CompactLargeHeap("重建完成后");
         }
         catch (OperationCanceledException)
         {
@@ -376,6 +404,14 @@ public sealed class IndexService : IDisposable
             Path.Combine(local, "Microsoft", "Windows"),
             Path.Combine(local, "CrashDumps"),
             Path.Combine(roaming, "Microsoft", "Windows", "Recent"),
+            // 自己的日志/缓存：索引每次落盘都会写这里，不排除的话自己把自己刷爆
+            Path.Combine(local, "ShunSeek"),
+            // 浏览器/编辑器这些高频写的缓存区（只排缓存，不排它们的配置和书签）
+            Path.Combine(local, "Google", "Chrome", "User Data", "Default", "Cache"),
+            Path.Combine(local, "Microsoft", "Edge", "User Data", "Default", "Cache"),
+            Path.Combine(roaming, "Code", "Cache"),
+            Path.Combine(roaming, "Code", "CachedData"),
+            Path.Combine(roaming, "Code", "logs"),
         };
         return list.Where(p => !string.IsNullOrEmpty(p)).ToArray();
     }
@@ -411,7 +447,7 @@ public sealed class IndexService : IDisposable
             }
             else
             {
-                var watcher = new DirectoryUpdateWatcher(PortableRoots());
+                var watcher = new DirectoryUpdateWatcher(PortableRoots(), PortableExcludes());
                 watcher.Changed += c => _queue.Enqueue(PendingChange.FromFs(c));
                 watcher.Start();
                 _watchers.Add(watcher);

@@ -207,6 +207,107 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// 按类型折叠：High（应用/文档/文件夹）原样保留；其余同 TypeLabel 的条目，
+    /// 一组超过 <see cref="FoldThreshold"/> 条就压成一行"N 个 XXX"，放在该组首次出现的位置。
+    /// 折叠行本身不可打开，点一下展开。
+    /// </summary>
+    private List<ResultItemViewModel> FoldByType(List<ResultItemViewModel> items)
+    {
+        const int FoldThreshold = 4;   // 同类超过这么多条才折叠
+        const int AlwaysVisible = 5;   // 前几条无论如何都露出来，不然全是低价值时列表会空
+
+        // 先数一遍每组有多少条，才知道哪些该折
+        var totals = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            if (item.Importance == TypeImportance.High) continue;
+            totals.TryGetValue(item.TypeLabel, out int count);
+            totals[item.TypeLabel] = count + 1;
+        }
+
+        // 前 AlwaysVisible 条（不分类型）保留可见，剩下的才参与折叠
+        var alwaysShow = new HashSet<ResultItemViewModel>(ReferenceEqualityComparer.Instance);
+        foreach (var item in items.Where(x => x.Importance != TypeImportance.High).Take(AlwaysVisible))
+            alwaysShow.Add(item);
+
+        var folded = new List<ResultItemViewModel>(items.Count);
+        var emitted = new HashSet<string>(StringComparer.Ordinal);
+        int lowTotal = 0;
+
+        foreach (var item in items)
+        {
+            if (item.Importance == TypeImportance.High)
+            {
+                folded.Add(item);
+                continue;
+            }
+
+            if (alwaysShow.Contains(item))
+            {
+                folded.Add(item);
+                continue;
+            }
+
+            // 日志/缓存/临时文件不分类别，全部并成一条，免得出现五行"N 个 XXX"
+            if (item.Importance == TypeImportance.Low)
+            {
+                lowTotal++;
+                continue;
+            }
+
+            if (totals[item.TypeLabel] < FoldThreshold)
+            {
+                folded.Add(item);
+                continue;
+            }
+
+            if (emitted.Add(item.TypeLabel))
+            {
+                int count = totals[item.TypeLabel] - alwaysShow.Count(x => x.TypeLabel == item.TypeLabel);
+                if (count <= 0) continue;
+                folded.Add(new ResultItemViewModel
+                {
+                    Name = $"{count} 个{item.TypeLabel} · 点击展开",
+                    Path = string.Empty,
+                    Category = EntryCategory.Other,
+                    CategoryLabel = "折叠",
+                    TypeLabel = "折叠",
+                    Importance = TypeImportance.Low,
+                    ImportanceBrush = ImportanceBrushOf(TypeImportance.Low),
+                    IsGroup = true,
+                    StoreIndex = -1,
+                });
+            }
+        }
+
+        int lowShown = alwaysShow.Count(x => x.Importance == TypeImportance.Low);
+        lowTotal -= lowShown;
+
+        if (lowTotal >= 2)
+        {
+            folded.Add(new ResultItemViewModel
+            {
+                Name = $"其他 {lowTotal} 项（日志/缓存/临时文件）· 点击展开",
+                Path = string.Empty,
+                Category = EntryCategory.Other,
+                CategoryLabel = "折叠",
+                TypeLabel = "折叠",
+                Importance = TypeImportance.Low,
+                ImportanceBrush = ImportanceBrushOf(TypeImportance.Low),
+                IsGroup = true,
+                StoreIndex = -1,
+            });
+        }
+        else if (lowTotal == 1)
+        {
+            // 只剩一条低价值条目：没必要折叠，直接放出来
+            folded.AddRange(items.Where(x => x.Importance == TypeImportance.Low && !alwaysShow.Contains(x)));
+        }
+
+        return folded;
+    }
+
     /// <summary>展开被折叠的"其他 N 项"。</summary>
     public void ExpandResults()
     {
@@ -306,27 +407,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 items = hits.Select(h => FromIndex(snapshot, h.Index)).ToList();
                 resultText = $"{hits.Count} 项 · {sw.Elapsed.TotalMilliseconds:F0} ms";
 
-                // 日志/缓存/临时文件这类不重要的一律叠成一行，点开再看
-                if (!_expanded)
-                {
-                    var minor = items.Where(x => x.Importance == TypeImportance.Low).ToList();
-                    if (minor.Count >= 4)
-                    {
-                        items = items.Where(x => x.Importance != TypeImportance.Low).ToList();
-                        items.Add(new ResultItemViewModel
-                        {
-                            Name = $"其他 {minor.Count} 项（日志/缓存/临时文件）· 点击展开",
-                            Path = string.Empty,
-                            Category = EntryCategory.Other,
-                            CategoryLabel = "折叠",
-                            TypeLabel = "折叠",
-                            Importance = TypeImportance.Low,
-                            ImportanceBrush = ImportanceBrushOf(TypeImportance.Low),
-                            IsGroup = true,
-                            StoreIndex = -1,
-                        });
-                    }
-                }
+                // 同类型、又不重要的条目叠成一行，点开再看。
+                // 应用/文档/文件夹（High）永远不折叠——那是用户真正要找的东西；
+                // 其余按"类型"分组，一组里堆了 4 条以上就收起（搜 log 会有一百个 LOG，
+                // 搜某个词也会有一堆同名同类的 dll/png，都是一个道理）。
+                if (!_expanded) items = FoldByType(items);
             }
         }
         catch (OperationCanceledException) { return; }
@@ -367,7 +452,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private (List<ResultItemViewModel> Items, int PinnedCount, int RecentCount) BuildHomeItems(
         UsageStore? usage, PinnedStore? pinned, CancellationToken token)
     {
-        const int limit = 12;
+        // 固定的不设上限：用户自己往首页放多少就是多少。
+        // 最近使用仍然只取前 24 条——那是"猜你想用"，不是收藏夹。
+        const int recentLimit = 24;
         var items = new List<ResultItemViewModel>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int pinnedCount = 0;
@@ -375,17 +462,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
         foreach (var path in pinned?.Paths ?? Array.Empty<string>())
         {
             token.ThrowIfCancellationRequested();
-            if (items.Count >= limit) break;
             if (!seen.Add(path)) continue;
             items.Add(FromPath(path, isPinned: true));
             pinnedCount++;
         }
 
         int recentCount = 0;
-        foreach (var path in usage?.TopPaths(limit) ?? Array.Empty<string>())
+        foreach (var path in usage?.TopPaths(recentLimit) ?? Array.Empty<string>())
         {
             token.ThrowIfCancellationRequested();
-            if (items.Count >= limit) break;
+            if (recentCount >= recentLimit) break;
             if (!seen.Add(path)) continue;
             items.Add(FromPath(path));
             recentCount++;

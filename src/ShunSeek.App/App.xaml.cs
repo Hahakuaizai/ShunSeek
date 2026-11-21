@@ -112,6 +112,10 @@ public partial class App : System.Windows.Application
             });
         }
 
+        // 开发/截图用：直接弹出托盘菜单（没法用脚本点托盘图标）
+        if (e.Args.Contains("--tray-menu", StringComparer.OrdinalIgnoreCase))
+            Dispatcher.BeginInvoke(() => _tray.ShowMenu());
+
         // 索引在后台建：几秒后状态栏会变成"就绪"，期间窗口已经能呼出（空结果 + 进度提示）
         _ = _index.StartAsync();
     }

@@ -48,7 +48,7 @@ public sealed class SearchIndex
     private bool IsBase(int index) => index < Base.Count;
 
     public string DisplayNameAt(int index) =>
-        IsBase(index) ? Base.DisplayName[index] : Delta.DisplayName[index - Base.Count];
+        IsBase(index) ? Base.NameOf(index) : Delta.NameOf(index - Base.Count);
 
     public string FullPathAt(int index) =>
         IsBase(index) ? Base.FullPath[index] : Delta.FullPath[index - Base.Count];
@@ -182,7 +182,7 @@ public sealed class SearchIndex
                             EntryCategory.InstallDir or EntryCategory.Folder => 4f,
                             _ => 0f,
                         };
-                        if (store.DisplayName[i].Length <= 6) score += 8f; // 短名优先，和名字通道一致
+                        if (store.NameLength[i] <= 6) score += 8f; // 短名优先，和名字通道一致
                         // 全拼正好等于查询串（weixin → 微信）：和名字精确命中同等对待
                         if (matchAt == 0 && store.PinyinLength[i] == qSpan.Length) score += 30f;
                         score += PathPenalty(store.FullPath[i]);

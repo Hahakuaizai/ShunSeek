@@ -163,11 +163,11 @@ public static class FileTypeName
             int start = rest.LastIndexOfAny('\\', '/');
             var segment = start < 0 ? rest : rest[(start + 1)..];
 
-            if (NoiseNames.Contains(segment.ToString())) return true;
-            // 目录名里带 cache/log 字样的也一并算（WebView2\EBWebView\Default\LOG 这种）
-            if (segment.Contains("cache", StringComparison.OrdinalIgnoreCase) ||
-                segment.Contains("log", StringComparison.OrdinalIgnoreCase))
-                return true;
+            var text = segment.ToString();
+            if (NoiseNames.Contains(text)) return true;
+            // 目录名里带 cache 的算（cef_cache / shadercache / Cache2）；log 只认整段相等，
+            // 否则 blog、catalog 这种正常名字会被误判成日志目录
+            if (text.Contains("cache", StringComparison.OrdinalIgnoreCase)) return true;
 
             if (start < 0) return false;
         }

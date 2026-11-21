@@ -29,7 +29,11 @@ public sealed class IconCache : IDisposable
 {
     private readonly ConcurrentDictionary<string, BitmapSource?> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<BitmapSource?>> _pending = new(StringComparer.OrdinalIgnoreCase);
-    private readonly BlockingCollection<Request> _queue = new(new ConcurrentQueue<Request>(), 512);
+    private readonly BlockingCollection<Request> _queue = new(new ConcurrentQueue<Request>(), 4096);
+
+    /// <summary>失败次数：失败不写死缓存，允许重试（启动瞬间 Shell 忙，第一次经常取不到）。</summary>
+    private readonly ConcurrentDictionary<string, int> _failures = new(StringComparer.OrdinalIgnoreCase);
+    private const int MaxAttempts = 3;
     private readonly List<Thread> _workers = new();
     private bool _disposed;
 
@@ -58,7 +62,14 @@ public sealed class IconCache : IDisposable
     public Task<BitmapSource?> GetAsync(string path, EntryCategory category)
     {
         var key = KeyFor(path, category);
-        if (_cache.TryGetValue(key, out var cached)) return Task.FromResult(cached);
+        if (_cache.TryGetValue(key, out var cached))
+        {
+            // 缓存里是"取不到"：只要没超过重试次数就再试一次，
+            // 否则一次启动瞬间的失败会让这个图标永久变成灰块。
+            if (cached != null || _failures.GetOrAdd(key, 0) >= MaxAttempts)
+                return Task.FromResult(cached);
+            _cache.TryRemove(key, out _);
+        }
 
         var mine = new TaskCompletionSource<BitmapSource?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var actual = _pending.GetOrAdd(key, mine);
@@ -84,7 +95,18 @@ public sealed class IconCache : IDisposable
                 try { icon = Extract(request.Path, request.Category); }
                 catch { /* 单个图标失败不影响其他 */ }
 
-                _cache[request.Key] = icon; // 失败也缓存（null），避免同一个坏路径反复重试
+                if (icon != null)
+                {
+                    _cache[request.Key] = icon;
+                    _failures.TryRemove(request.Key, out _);
+                }
+                else
+                {
+                    // 失败只记次数，不把 null 焊死在缓存里——超过上限才彻底放弃
+                    int attempts = _failures.AddOrUpdate(request.Key, 1, (_, n) => n + 1);
+                    if (attempts >= MaxAttempts) _cache[request.Key] = null;
+                }
+
                 if (_pending.TryRemove(request.Key, out var tcs)) tcs.TrySetResult(icon);
             }
         }
@@ -113,6 +135,15 @@ public sealed class IconCache : IDisposable
         {
             var image = FromShellItem(path);
             if (image != null) return image;
+        }
+
+        // ①.5 路径存在但 ShellItem 失败：直接拿路径问 SHGetFileInfo（exe 关联图标）
+        if (exists && !string.IsNullOrEmpty(path))
+        {
+            var direct = new SHFILEINFO();
+            var directResult = SHGetFileInfo(path, 0, ref direct,
+                (uint)Marshal.SizeOf<SHFILEINFO>(), SHGFI_ICON | SHGFI_LARGEICON);
+            if (directResult != IntPtr.Zero && direct.hIcon != IntPtr.Zero) return FromHIcon(direct.hIcon);
         }
 
         // ② 没有真实路径（注册表里的软件只登记了名字）或上面失败：按类型/扩展名要通用图标，

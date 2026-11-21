@@ -34,7 +34,8 @@ public sealed class IndexStore
     public ulong[] FileRef { get; private init; } = Array.Empty<ulong>(); // NTFS 文件引用号，无则 0
 
     // —— 冷数据（命中后才访问）——
-    public string[] DisplayName { get; private init; } = Array.Empty<string>();
+    // 只存全路径：显示名就是它的文件名部分，取的时候算一次就行（每次搜索只算前一两百条），
+    // 没必要为 44 万条各存一份重复的短名字符串。
     public string[] FullPath { get; private init; } = Array.Empty<string>();
 
     /// <summary>给缓存恢复用：直接从现成数组装配一个只读索引，不做任何转换。</summary>
@@ -43,20 +44,31 @@ public sealed class IndexStore
         char[] initialsArena, int[] initialsOffset, int[] initialsLength,
         char[] pinyinArena, int[] pinyinOffset, int[] pinyinLength,
         byte[] category, int[] parentRef, ulong[] fileRef,
-        string[] displayName, string[] fullPath)
+        string[] fullPath)
         => new()
         {
-            Count = displayName.Length,
+            Count = fullPath.Length,
             NameArena = nameArena, NameOffset = nameOffset, NameLength = nameLength,
             InitialsArena = initialsArena, InitialsOffset = initialsOffset, InitialsLength = initialsLength,
             PinyinArena = pinyinArena, PinyinOffset = pinyinOffset, PinyinLength = pinyinLength,
             Category = category, ParentRef = parentRef, FileRef = fileRef,
-            DisplayName = displayName, FullPath = fullPath,
+            FullPath = fullPath,
         };
 
     public ReadOnlySpan<char> LowerName(int i) => NameArena.AsSpan(NameOffset[i], NameLength[i]);
-    public ReadOnlySpan<char> Initials(int i) => InitialsArena.AsSpan(InitialsOffset[i], InitialsLength[i]);
-    public ReadOnlySpan<char> FullPinyin(int i) => PinyinArena.AsSpan(PinyinOffset[i], PinyinLength[i]);
+
+    // 首字母/全拼为空 = 和名字本身完全一样（纯英文名），直接复用名字那份内存，
+    // 不用再存一遍。纯英文的条目占绝大多数，这一条省掉近三分之二的字符池。
+    public ReadOnlySpan<char> Initials(int i) => InitialsLength[i] == 0
+        ? LowerName(i)
+        : InitialsArena.AsSpan(InitialsOffset[i], InitialsLength[i]);
+
+    public ReadOnlySpan<char> FullPinyin(int i) => PinyinLength[i] == 0
+        ? LowerName(i)
+        : PinyinArena.AsSpan(PinyinOffset[i], PinyinLength[i]);
+
+    /// <summary>显示名：全路径的文件名部分。</summary>
+    public string NameOf(int i) => System.IO.Path.GetFileName(FullPath[i]);
     public EntryCategory CategoryOf(int i) => (EntryCategory)Category[i];
 
     /// <summary>索引内存粗估（字节），给 Bench 和诊断页用：数组实际占用 + string 估算。</summary>
@@ -66,7 +78,7 @@ public sealed class IndexStore
         bytes += (long)NameArena.Length * 2 + (long)InitialsArena.Length * 2 + (long)PinyinArena.Length * 2;
         bytes += (long)Count * (4 + 4 + 4 + 4 + 4 + 4 + 1 + 4 + 8); // 各并行数组
         for (int i = 0; i < Count; i++)
-            bytes += 24 + (DisplayName[i].Length + FullPath[i].Length) * 2L + 16; // string 对象头粗估
+            bytes += 24 + FullPath[i].Length * 2L + 16; // string 对象头粗估
         return bytes;
     }
 
@@ -81,9 +93,9 @@ public sealed class IndexStore
         private readonly List<byte> _cat = new();
         private readonly List<int> _parent = new();
         private readonly List<ulong> _refs = new();
-        private readonly List<string> _display = new(), _path = new();
+        private readonly List<string> _path = new();
 
-        public int Count => _display.Count;
+        public int Count => _path.Count;
 
         /// <param name="parentIndex">父条目下标，IndexBuilder 解析完父链后回填，未知传 -1。</param>
         public void Add(string displayName, string fullPath, EntryCategory category, ulong fileRef, int parentIndex)
@@ -93,41 +105,99 @@ public sealed class IndexStore
             _nameLen.Add(lower.Length);
             _nameArena.AddRange(lower);
 
+            // 首字母 / 全拼：和名字一样（纯英文名）就记长度 0，表示"复用名字"，不再存一遍
             var initials = PinyinInitials.Convert(displayName);
-            _initOff.Add(_initialsArena.Count);
-            _initLen.Add(initials.Length);
-            _initialsArena.AddRange(initials);
+            bool initialsSame = initials.Equals(lower, StringComparison.Ordinal);
+            _initOff.Add(initialsSame ? 0 : _initialsArena.Count);
+            _initLen.Add(initialsSame ? 0 : initials.Length);
+            if (!initialsSame) _initialsArena.AddRange(initials);
 
             // 全拼（weixin）：只在名字里有汉字时才真正去查表
             var pinyin = PinyinFull.Convert(displayName);
-            _pinyinOff.Add(_pinyinArena.Count);
-            _pinyinLen.Add(pinyin.Length);
-            _pinyinArena.AddRange(pinyin);
+            bool pinyinSame = pinyin.Equals(lower, StringComparison.Ordinal);
+            _pinyinOff.Add(pinyinSame ? 0 : _pinyinArena.Count);
+            _pinyinLen.Add(pinyinSame ? 0 : pinyin.Length);
+            if (!pinyinSame) _pinyinArena.AddRange(pinyin);
 
             _cat.Add((byte)category);
             _parent.Add(parentIndex);
             _refs.Add(fileRef);
-            _display.Add(displayName);
             _path.Add(fullPath);
         }
 
-        public IndexStore Freeze() => new()
+        public IndexStore Freeze()
         {
-            Count = Count,
-            NameArena = _nameArena.ToArray(),
-            NameOffset = _nameOff.ToArray(),
-            NameLength = _nameLen.ToArray(),
-            InitialsArena = _initialsArena.ToArray(),
-            InitialsOffset = _initOff.ToArray(),
-            InitialsLength = _initLen.ToArray(),
-            PinyinArena = _pinyinArena.ToArray(),
-            PinyinOffset = _pinyinOff.ToArray(),
-            PinyinLength = _pinyinLen.ToArray(),
-            Category = _cat.ToArray(),
-            ParentRef = _parent.ToArray(),
-            FileRef = _refs.ToArray(),
-            DisplayName = _display.ToArray(),
-            FullPath = _path.ToArray(),
-        };
+            var store = new IndexStore
+            {
+                Count = Count,
+                NameArena = CopyChars(_nameArena),
+                NameOffset = CopyInts(_nameOff),
+                NameLength = CopyInts(_nameLen),
+                InitialsArena = CopyChars(_initialsArena),
+                InitialsOffset = CopyInts(_initOff),
+                InitialsLength = CopyInts(_initLen),
+                PinyinArena = CopyChars(_pinyinArena),
+                PinyinOffset = CopyInts(_pinyinOff),
+                PinyinLength = CopyInts(_pinyinLen),
+                Category = CopyBytes(_cat),
+                ParentRef = CopyInts(_parent),
+                FileRef = CopyUlongs(_refs),
+                FullPath = _path.ToArray(),
+            };
+
+            // 构建期的 List 全是几 MB~几十 MB 的底层数组，Freeze 之后就没用了。
+            // 不主动清空的话，它们要等下一次大对象堆压缩才还回去——任务管理器里
+            // 看到的就是"刚建完索引，私有内存还是六七百兆"。
+            ReleaseBuffers();
+            return store;
+        }
+
+        /// <summary>清掉构建期的缓冲，让内存立刻可回收。</summary>
+        private void ReleaseBuffers()
+        {
+            _nameArena.Clear(); _nameArena.TrimExcess();
+            _initialsArena.Clear(); _initialsArena.TrimExcess();
+            _pinyinArena.Clear(); _pinyinArena.TrimExcess();
+            _nameOff.Clear(); _nameOff.TrimExcess();
+            _nameLen.Clear(); _nameLen.TrimExcess();
+            _initOff.Clear(); _initOff.TrimExcess();
+            _initLen.Clear(); _initLen.TrimExcess();
+            _pinyinOff.Clear(); _pinyinOff.TrimExcess();
+            _pinyinLen.Clear(); _pinyinLen.TrimExcess();
+            _cat.Clear(); _cat.TrimExcess();
+            _parent.Clear(); _parent.TrimExcess();
+            _refs.Clear(); _refs.TrimExcess();
+            _path.Clear(); _path.TrimExcess();
+        }
+
+        // ToArray() 在 List 内部会先 EnsureCapacity(count)（容量可能已经是 2 倍），
+        // 多拷一份临时大数组；这里按精确长度 new + CopyTo，峰值只多一份目标数组。
+        private static char[] CopyChars(List<char> source)
+        {
+            var result = new char[source.Count];
+            source.CopyTo(result);
+            return result;
+        }
+
+        private static int[] CopyInts(List<int> source)
+        {
+            var result = new int[source.Count];
+            source.CopyTo(result);
+            return result;
+        }
+
+        private static byte[] CopyBytes(List<byte> source)
+        {
+            var result = new byte[source.Count];
+            source.CopyTo(result);
+            return result;
+        }
+
+        private static ulong[] CopyUlongs(List<ulong> source)
+        {
+            var result = new ulong[source.Count];
+            source.CopyTo(result);
+            return result;
+        }
     }
 }

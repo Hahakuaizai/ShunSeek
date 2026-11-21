@@ -372,8 +372,10 @@
                          MouseDoubleClick="ResultsList_MouseDoubleClick"
                          PreviewMouseRightButtonDown="ResultsList_PreviewMouseRightButtonDown">
                     <ListBox.ItemsPanel>
+                        <!-- 首页不再限制数量，必须用能虚拟化的面板：WrapPanel 不是
+                             VirtualizingPanel，固定条目一多就会一次性生成全部磁贴、卡顿明显。 -->
                         <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
+                            <ui:VirtualizingWrapPanel Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>

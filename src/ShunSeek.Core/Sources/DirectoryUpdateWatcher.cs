@@ -16,9 +16,19 @@ public readonly record struct FsChange(FsChangeKind Kind, string Path, string? O
 public sealed class DirectoryUpdateWatcher : IDisposable
 {
     private readonly string[] _roots;
+    private readonly string[] _excluded;
     private readonly List<FileSystemWatcher> _watchers = new();
 
-    public DirectoryUpdateWatcher(IEnumerable<string> roots) => _roots = roots.ToArray();
+    /// <param name="excludedDirs">
+    /// 不监听（也不上报）的目录：临时目录、缓存、日志这些地方每秒都在变，
+    /// 全收下来的话队列会被垃圾变更灌满，攒到阈值就触发整表重建——
+    /// 表现就是状态栏一直"索引变化过多…"、搜索期间索引反复重建。
+    /// </param>
+    public DirectoryUpdateWatcher(IEnumerable<string> roots, IEnumerable<string>? excludedDirs = null)
+    {
+        _roots = roots.ToArray();
+        _excluded = (excludedDirs ?? Array.Empty<string>()).ToArray();
+    }
 
     public event Action<FsChange>? Changed;
     public event Action<Exception>? Faulted;
@@ -55,8 +65,22 @@ public sealed class DirectoryUpdateWatcher : IDisposable
         }
     }
 
+    /// <summary>路径是否落在排除目录里（前缀匹配，忽略大小写）。</summary>
+    private bool IsExcluded(string path)
+    {
+        foreach (var dir in _excluded)
+        {
+            if (dir.Length == 0) continue;
+            if (path.StartsWith(dir, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
     private void Emit(FsChangeKind kind, string path, string? oldPath)
     {
+        // 垃圾目录里的变更连队都别进
+        if (IsExcluded(path) || (oldPath != null && IsExcluded(oldPath))) return;
+
         try
         {
             // Watcher 不告诉我们是文件还是目录：路径还在就直接问文件系统；

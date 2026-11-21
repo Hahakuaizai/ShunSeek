@@ -15,7 +15,7 @@ namespace ShunSeek.Core;
 public static class IndexCache
 {
     private const int Magic = 0x53534958;   // "SSIX"
-    private const int Version = 1;
+    private const int Version = 2;
 
     public static string DefaultPath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -53,19 +53,18 @@ public static class IndexCache
             var category = ReadBytes(reader);
             var parentRef = ReadInts(reader);
             var fileRef = ReadUlongs(reader);
-            var displayName = ReadStrings(reader, count);
             var fullPath = ReadStrings(reader, count);
 
             // 长度自洽检查：截断的缓存宁可丢掉也不要拿半截索引去搜
             if (nameOffset.Length != count || nameLength.Length != count ||
-                category.Length != count || displayName.Length != count || fullPath.Length != count)
+                category.Length != count || fullPath.Length != count)
                 return null;
 
             var store = IndexStore.FromArrays(
                 nameArena, nameOffset, nameLength,
                 initialsArena, initialsOffset, initialsLength,
                 pinyinArena, pinyinOffset, pinyinLength,
-                category, parentRef, fileRef, displayName, fullPath);
+                category, parentRef, fileRef, fullPath);
 
             return new CachedIndex(store, scope, builtAt);
         }
@@ -106,7 +105,6 @@ public static class IndexCache
             WriteBytes(writer, store.Category);
             WriteInts(writer, store.ParentRef);
             WriteUlongs(writer, store.FileRef);
-            WriteStrings(writer, store.DisplayName);
             WriteStrings(writer, store.FullPath);
         }
 
@@ -121,12 +119,27 @@ public static class IndexCache
         w.Write(MemoryMarshal.AsBytes(values.AsSpan()));
     }
 
+    /// <summary>
+    /// 直接读进目标数组，不经过中间的 byte[]。
+    /// 143MB 的缓存如果先 ReadBytes 再 ToArray，瞬间会多占一整份（大对象堆还不好回收）。
+    /// </summary>
+    private static void ReadExact(BinaryReader r, Span<byte> buffer)
+    {
+        var stream = r.BaseStream;
+        while (buffer.Length > 0)
+        {
+            int read = stream.Read(buffer);
+            if (read <= 0) throw new EndOfStreamException();
+            buffer = buffer[read..];
+        }
+    }
+
     private static char[] ReadChars(BinaryReader r)
     {
         int length = r.ReadInt32();
-        var bytes = r.ReadBytes(length * 2);
-        if (bytes.Length != length * 2) throw new EndOfStreamException();
-        return MemoryMarshal.Cast<byte, char>(bytes.AsSpan()).ToArray();
+        var result = new char[length];
+        ReadExact(r, MemoryMarshal.AsBytes(result.AsSpan()));
+        return result;
     }
 
     private static void WriteInts(BinaryWriter w, int[] values)
@@ -138,9 +151,9 @@ public static class IndexCache
     private static int[] ReadInts(BinaryReader r)
     {
         int length = r.ReadInt32();
-        var bytes = r.ReadBytes(length * 4);
-        if (bytes.Length != length * 4) throw new EndOfStreamException();
-        return MemoryMarshal.Cast<byte, int>(bytes.AsSpan()).ToArray();
+        var result = new int[length];
+        ReadExact(r, MemoryMarshal.AsBytes(result.AsSpan()));
+        return result;
     }
 
     private static void WriteUlongs(BinaryWriter w, ulong[] values)
@@ -152,9 +165,9 @@ public static class IndexCache
     private static ulong[] ReadUlongs(BinaryReader r)
     {
         int length = r.ReadInt32();
-        var bytes = r.ReadBytes(length * 8);
-        if (bytes.Length != length * 8) throw new EndOfStreamException();
-        return MemoryMarshal.Cast<byte, ulong>(bytes.AsSpan()).ToArray();
+        var result = new ulong[length];
+        ReadExact(r, MemoryMarshal.AsBytes(result.AsSpan()));
+        return result;
     }
 
     private static void WriteBytes(BinaryWriter w, byte[] values)
@@ -166,9 +179,9 @@ public static class IndexCache
     private static byte[] ReadBytes(BinaryReader r)
     {
         int length = r.ReadInt32();
-        var bytes = r.ReadBytes(length);
-        if (bytes.Length != length) throw new EndOfStreamException();
-        return bytes;
+        var result = new byte[length];
+        ReadExact(r, result);
+        return result;
     }
 
     private static void WriteStrings(BinaryWriter w, string[] values)
