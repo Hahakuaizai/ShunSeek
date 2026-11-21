@@ -277,10 +277,12 @@
                          VirtualizingPanel.IsVirtualizing="True"
                          VirtualizingPanel.VirtualizationMode="Recycling"
                          MouseDoubleClick="ResultsList_MouseDoubleClick"
+                         SelectionChanged="ResultsList_SelectionChanged"
                          PreviewMouseRightButtonDown="ResultsList_PreviewMouseRightButtonDown">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid Height="42" ToolTip="{Binding Path}">
+                            <Grid Height="42">
+                              <Grid Visibility="{Binding NormalVisibility}" ToolTip="{Binding Path}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="34" />
                                     <ColumnDefinition Width="*" />
@@ -306,10 +308,26 @@
                                     <TextBlock Text="&#xE840;" FontFamily="{StaticResource IconFont}" FontSize="10"
                                                Foreground="#3B82F6" VerticalAlignment="Center" Margin="0,0,6,0"
                                                Visibility="{Binding PinVisibility}" />
-                                    <Border CornerRadius="6" Background="#0F1D232B" Padding="8,2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding CategoryLabel}" FontSize="10.5" Foreground="#8C1D232B" />
+                                    <!-- 重要级圆点 + 具体类型名（Word 文档 / Python 源码 / 文件夹…） -->
+                                    <Ellipse Width="6" Height="6" Fill="{Binding ImportanceBrush}"
+                                             VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Border CornerRadius="6" Background="#0F1D232B" Padding="8,2" VerticalAlignment="Center"
+                                            ToolTip="{Binding CategoryLabel}">
+                                        <TextBlock Text="{Binding TypeLabel}" FontSize="10.5" Foreground="#8C1D232B" />
                                     </Border>
                                 </StackPanel>
+                              </Grid>
+
+                              <!-- 折叠条：日志/缓存/临时文件堆成一行，点一下才展开 -->
+                              <Border Visibility="{Binding GroupVisibility}" CornerRadius="8"
+                                      Background="#0A1D232B" Margin="0,3" Padding="12,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                  <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                             Foreground="#8C1D232B" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                  <TextBlock Text="{Binding Name}" FontSize="11.5" Foreground="#8C1D232B"
+                                             VerticalAlignment="Center" />
+                                </StackPanel>
+                              </Border>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

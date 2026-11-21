@@ -16,6 +16,21 @@ public sealed class ResultItemViewModel : INotifyPropertyChanged
     public required string Name { get; init; }
     public required string Path { get; init; }
     public required string CategoryLabel { get; init; }
+
+    /// <summary>这一行"具体是什么"：Word 文档 / Python 源码 / 文件夹……而不是笼统的"文档""代码"。</summary>
+    public required string TypeLabel { get; init; }
+
+    /// <summary>重要级的标识色（应用/文档为蓝，普通文件灰，日志/缓存更浅）。</summary>
+    public required System.Windows.Media.Brush ImportanceBrush { get; init; }
+
+    public required TypeImportance Importance { get; init; }
+
+    /// <summary>这一行是"其他 N 项"的折叠条，不是一个真实条目。</summary>
+    public bool IsGroup { get; init; }
+
+    public Visibility NormalVisibility => IsGroup ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility GroupVisibility => IsGroup ? Visibility.Visible : Visibility.Collapsed;
+
     public required EntryCategory Category { get; init; }
 
     /// <summary>在 SearchIndex 统一下标口径里的位置；"最近使用"列表里的条目为 -1。</summary>
@@ -72,6 +87,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _emptyHintText = "输入关键词开始搜索";
     private Visibility _emptyHintVisibility = Visibility.Visible;
     private bool _indexReady;
+    private bool _expanded;   // 结果里的"其他 N 项"是否已展开
     private Visibility _homeVisibility = Visibility.Visible;
     private Visibility _resultsVisibility = Visibility.Collapsed;
     private string _homeCaption = string.Empty;
@@ -88,7 +104,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string Query
     {
         get => _query;
-        set { if (_query != value) { _query = value; OnPropertyChanged(); ScheduleSearch(); } }
+        set
+        {
+            if (_query == value) return;
+            _query = value;
+            _expanded = false; // 换关键词就重新折叠
+            OnPropertyChanged();
+            ScheduleSearch();
+        }
     }
 
     /// <summary>状态栏左侧：索引条数 / 最后更新。</summary>
@@ -184,6 +207,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>展开被折叠的"其他 N 项"。</summary>
+    public void ExpandResults()
+    {
+        if (_expanded) return;
+        _expanded = true;
+        ScheduleSearch();
+    }
+
+    /// <summary>把任意路径（文件夹/文件）固定到首页——空白处右键菜单用。</summary>
+    public void PinPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        Pinned?.Add(path);
+        ScheduleSearch();
+    }
+
     /// <summary>状态栏中间那行的临时提示（"路径已不存在"之类）。</summary>
     public void Notify(string message) => ResultText = message;
 
@@ -262,9 +301,32 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
             else
             {
-                var hits = await Task.Run(() => engine.Search(query, category, 100, token), token);
+                var hits = await Task.Run(
+                    () => engine.Search(query, category, _expanded ? 300 : 100, token), token);
                 items = hits.Select(h => FromIndex(snapshot, h.Index)).ToList();
                 resultText = $"{hits.Count} 项 · {sw.Elapsed.TotalMilliseconds:F0} ms";
+
+                // 日志/缓存/临时文件这类不重要的一律叠成一行，点开再看
+                if (!_expanded)
+                {
+                    var minor = items.Where(x => x.Importance == TypeImportance.Low).ToList();
+                    if (minor.Count >= 4)
+                    {
+                        items = items.Where(x => x.Importance != TypeImportance.Low).ToList();
+                        items.Add(new ResultItemViewModel
+                        {
+                            Name = $"其他 {minor.Count} 项（日志/缓存/临时文件）· 点击展开",
+                            Path = string.Empty,
+                            Category = EntryCategory.Other,
+                            CategoryLabel = "折叠",
+                            TypeLabel = "折叠",
+                            Importance = TypeImportance.Low,
+                            ImportanceBrush = ImportanceBrushOf(TypeImportance.Low),
+                            IsGroup = true,
+                            StoreIndex = -1,
+                        });
+                    }
+                }
             }
         }
         catch (OperationCanceledException) { return; }
@@ -364,14 +426,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static ResultItemViewModel FromIndex(SearchIndex index, int i)
     {
         var cat = index.CategoryAt(i);
+        var path = index.FullPathAt(i);
+        var isDirectory = cat is EntryCategory.Folder or EntryCategory.InstallDir;
+        var (typeLabel, importance) = FileTypeName.Describe(path, cat, isDirectory);
         return new ResultItemViewModel
         {
             Name = index.DisplayNameAt(i),
-            Path = index.FullPathAt(i),
+            Path = path,
             Category = cat,
             CategoryLabel = EntryCategoryNames.DisplayName(cat),
+            TypeLabel = typeLabel,
+            Importance = importance,
+            ImportanceBrush = ImportanceBrushOf(importance),
             StoreIndex = i,
-            IsDirectory = cat is EntryCategory.Folder or EntryCategory.InstallDir,
+            IsDirectory = isDirectory,
         };
     }
 
@@ -381,16 +449,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var cat = isDir ? EntryCategory.Folder : CategoryClassifier.ClassifyByExtension(path);
         var name = Path.GetFileName(path.TrimEnd('\\'));
         if (string.IsNullOrEmpty(name)) name = path;
+        var (typeLabel, importance) = FileTypeName.Describe(path, cat, isDir);
         return new ResultItemViewModel
         {
             Name = name,
             Path = path,
             Category = cat,
             CategoryLabel = EntryCategoryNames.DisplayName(cat),
+            TypeLabel = typeLabel,
+            Importance = importance,
+            ImportanceBrush = ImportanceBrushOf(importance),
             StoreIndex = -1,
             IsDirectory = isDir,
             IsPinned = isPinned,
         };
+    }
+
+    /// <summary>重要级标识色：高=主题蓝，普通=中灰，低=浅灰。</summary>
+    private static System.Windows.Media.Brush ImportanceBrushOf(TypeImportance importance)
+    {
+        var hex = importance switch
+        {
+            TypeImportance.High => "#3B82F6",
+            TypeImportance.Normal => "#8A9099",
+            _ => "#C2C7CE",
+        };
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
     }
 
     private static bool SafeIsDirectory(string path)

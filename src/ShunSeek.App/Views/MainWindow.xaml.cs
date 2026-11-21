@@ -237,16 +237,86 @@ public partial class MainWindow
     private void ResultsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         => OpenSelected(locateInExplorer: false);
 
-    /// <summary>右键：选中被点的那一格，再弹"打开 / 定位 / 复制路径 / 添加到首页"。</summary>
+    /// <summary>
+    /// 右键分两种：点在条目上给条目菜单；点在空白处给"往首页加东西"的菜单。
+    /// （之前不管点哪儿都弹当前选中项的动作，空地上右键出现 wegame.exe 的菜单，很莫名其妙。）
+    /// </summary>
     private void ResultsList_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         var list = sender as ListBox ?? ActiveList;
         var hit = list.InputHitTest(e.GetPosition(list)) as DependencyObject;
         while (hit != null && hit is not ListBoxItem) hit = VisualTreeHelper.GetParent(hit);
-        if (hit is ListBoxItem container) container.IsSelected = true;
 
-        ShowItemMenu(list);
+        if (hit is ListBoxItem container)
+        {
+            container.IsSelected = true;
+            ShowItemMenu(list);
+        }
+        else
+        {
+            ShowBlankMenu(list);
+        }
         e.Handled = true;
+    }
+
+    /// <summary>空白处右键：把任意文件夹/文件固定到首页，以及索引的维护动作。</summary>
+    private void ShowBlankMenu(ListBox anchor)
+    {
+        var vm = ViewModel;
+        var menu = new ContextMenu();
+
+        var addFolder = new MenuItem { Header = "添加文件夹到首页…" };
+        addFolder.Click += (_, _) => PickAndPinFolder();
+        menu.Items.Add(addFolder);
+
+        var addFile = new MenuItem { Header = "添加文件到首页…" };
+        addFile.Click += (_, _) => PickAndPinFile();
+        menu.Items.Add(addFile);
+
+        menu.Items.Add(new Separator());
+
+        var refresh = new MenuItem { Header = "立即刷新索引" };
+        refresh.Click += (_, _) => vm.Service?.Refresh();
+        menu.Items.Add(refresh);
+
+        var rebuild = new MenuItem { Header = "重建索引" };
+        rebuild.Click += (_, _) => _ = vm.Service?.RebuildAsync("手动重建");
+        menu.Items.Add(rebuild);
+
+        menu.PlacementTarget = anchor;
+        menu.IsOpen = true;
+    }
+
+    private void PickAndPinFolder()
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "选择要固定到首页的文件夹",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = false,
+        };
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            ViewModel.PinPath(dialog.SelectedPath);
+    }
+
+    private void PickAndPinFile()
+    {
+        using var dialog = new System.Windows.Forms.OpenFileDialog
+        {
+            Title = "选择要固定到首页的文件",
+            Multiselect = true,
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+        foreach (var path in dialog.FileNames) ViewModel.PinPath(path);
+    }
+
+    /// <summary>点"其他 N 项"那一行：展开被折叠的结果。</summary>
+    private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0) return;
+        if (e.AddedItems[0] is ResultItemViewModel { IsGroup: true })
+            ViewModel.ExpandResults();
     }
 
     private void ShowItemMenu(ListBox anchor)
@@ -306,6 +376,13 @@ public partial class MainWindow
     {
         var item = SelectedItem();
         if (item == null) return;
+
+        // 折叠条不是真条目：点它只是展开
+        if (item.IsGroup)
+        {
+            ViewModel.ExpandResults();
+            return;
+        }
 
         if (!item.HasPath)
         {
