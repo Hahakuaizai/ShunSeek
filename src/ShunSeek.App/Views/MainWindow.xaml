@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:ctl="clr-namespace:ShunSeek.App.Controls"
+        xmlns:system="clr-namespace:System;assembly=System.Runtime"
         Title="瞬觅 ShunSeek"
         Width="700" Height="500"
         WindowStartupLocation="Manual"
@@ -18,6 +19,17 @@
          + 流动高光 + 沿圆角走的 1px 渐变描边。桌面透过 Mica 进来，白渐变盖在上面就是玻璃。 -->
     <ui:FluentWindow.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- 圆角体系（同心圆角：内角 ≈ 外角 − 内缩距离，越往里越小，视觉上才"套"得住）
+             外框  30 / 44  （椭圆角 = 连续曲率）
+             控件  12 / 20  （搜索框、按钮，内缩约 18~20）
+             磁贴  12 / 16  （列表里再缩一层） -->
+        <system:Double x:Key="RadiusOuterX">30</system:Double>
+        <system:Double x:Key="RadiusOuterY">44</system:Double>
+        <system:Double x:Key="RadiusControlX">12</system:Double>
+        <system:Double x:Key="RadiusControlY">20</system:Double>
+        <system:Double x:Key="RadiusTileX">12</system:Double>
+        <system:Double x:Key="RadiusTileY">16</system:Double>
 
         <LinearGradientBrush x:Key="GlassFill" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#7DF7F9FC" Offset="0" />
@@ -55,7 +67,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" CornerRadius="11" Background="Transparent">
+                        <Border x:Name="Bd" CornerRadius="10" Background="Transparent">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -78,7 +90,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <ctl:LiquidPanel x:Name="Bd" RadiusX="14" RadiusY="18"
+                        <ctl:LiquidPanel x:Name="Bd"
+                                         RadiusX="{StaticResource RadiusTileX}"
+                                         RadiusY="{StaticResource RadiusTileY}"
                                          Fill="Transparent" StrokeThickness="0">
                             <ContentPresenter Margin="4,7" />
                         </ctl:LiquidPanel>
@@ -98,7 +112,8 @@
         </Style>
     </ui:FluentWindow.Resources>
 
-    <ctl:LiquidPanel RadiusX="30" RadiusY="44" Fill="{StaticResource GlassFill}" Stroke="{StaticResource GlassStroke}">
+    <ctl:LiquidPanel RadiusX="{StaticResource RadiusOuterX}" RadiusY="{StaticResource RadiusOuterY}"
+                     Fill="{StaticResource GlassFill}" Stroke="{StaticResource GlassStroke}">
         <Grid>
             <!-- 面板里的柔光斑：玻璃后面透出来的颜色倾向（参考稿那三团渐变） -->
             <Ellipse Width="360" Height="300" HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -155,7 +170,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <ctl:LiquidPanel Grid.Column="0" Height="46" RadiusX="13" RadiusY="17"
+                    <ctl:LiquidPanel Grid.Column="0" Height="46"
+                                     RadiusX="{StaticResource RadiusControlX}"
+                                     RadiusY="{StaticResource RadiusControlY}"
                                      Fill="{StaticResource InnerFill}" Stroke="#66FFFFFF">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -239,7 +256,7 @@
                 <!-- ④ 图标网格 -->
                 <ListBox x:Name="ResultsList"
                          Grid.Row="2"
-                         Margin="18,6,12,0"
+                         Margin="18,8,18,0"
                          ItemsSource="{Binding Results}"
                          ItemContainerStyle="{StaticResource TileItem}"
                          Background="Transparent"
@@ -298,7 +315,7 @@
                             Cursor="Hand" Foreground="#8C1D232B">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" CornerRadius="11" Padding="9,5" Background="Transparent">
+                                <Border x:Name="Bd" CornerRadius="10" Padding="9,5" Background="Transparent">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                                    VerticalAlignment="Center" Margin="0,0,6,0" />
