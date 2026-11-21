@@ -10,6 +10,18 @@ namespace ShunSeek.Core.Sources;
 /// </summary>
 public sealed class DirectoryWalker : IIndexSource
 {
+    /// <summary>
+    /// 这些目录名一律不进索引：清一色的缓存、日志、构建中间产物。
+    /// 它们数量巨大、天天变，但对"找东西"毫无价值——搜 wx 不应该全是微信的缓存文件夹。
+    /// </summary>
+    private static readonly HashSet<string> NoiseDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cache", "caches", "gpucache", "code cache", "cachestorage", "cache data",
+        "crashpad", "crashdumps", "logs", "log", "temp", "tmp",
+        "node_modules", ".git", ".svn", ".vs", "__pycache__", ".pytest_cache",
+        "shadercache", "scriptcache", "webcache", "backup", "backups.tmp",
+    };
+
     private readonly string[] _roots;
     private readonly string[] _excludePrefixes;
     private readonly bool _includeFiles;
@@ -66,6 +78,7 @@ public sealed class DirectoryWalker : IIndexSource
                 if (isDir)
                 {
                     if (IsExcluded(path)) continue; // 缓存/临时目录：整棵子树跳过
+                    if (NoiseDirectoryNames.Contains(Path.GetFileName(path))) continue; // 按目录名跳过
                     stack.Push(path);
                     yield return new RawEntry(Path.GetFileName(path), path, EntryCategory.Folder, IsDirectory: true);
                 }

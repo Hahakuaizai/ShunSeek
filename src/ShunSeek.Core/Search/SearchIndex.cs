@@ -176,12 +176,13 @@ public sealed class SearchIndex
 
                         // 全拼命中排在"名字命中 / 首字母命中"之后：用户打全拼时意图明确，
                         // 但结果排序上仍优先给名字直接对上的那些。
-                        float score = (matchAt == 0 ? 68f : 42f) - matchAt * 0.1f + store.CategoryOf(i) switch
+                        float score = (matchAt == 0 ? 72f : 45f) - matchAt * 0.1f + store.CategoryOf(i) switch
                         {
-                            EntryCategory.App or EntryCategory.Shortcut => 12f,
+                            EntryCategory.App or EntryCategory.Shortcut => 34f,
                             EntryCategory.InstallDir or EntryCategory.Folder => 4f,
                             _ => 0f,
                         };
+                        if (store.DisplayName[i].Length <= 6) score += 8f; // 短名优先，和名字通道一致
                         if (boost != null) score += boost(store.FullPath[i]);
                         local.Add(new SearchHit(i, score, matchAt, false, true));
                     }
@@ -267,12 +268,19 @@ public sealed class SearchIndex
 
         score += store.CategoryOf(index) switch
         {
-            EntryCategory.App => 15f,
-            EntryCategory.Shortcut => 15f,
-            EntryCategory.InstallDir => 5f,
+            // 应用/快捷方式是人真正要找的东西，权重要压得住一堆同名文件
+            EntryCategory.App => 38f,
+            EntryCategory.Shortcut => 38f,
+            EntryCategory.InstallDir => 10f,
             EntryCategory.Folder => 5f,
             _ => 0f,
         };
+
+        // 短名优先："微信" 该压过 "wx1c36464bbee2507a"
+        if (name.Length <= 6) score += 8f;
+
+        // 哈希样式的名字基本是缓存/临时目录，压下去
+        if (LooksLikeHash(name)) score -= 30f;
 
         if (boost != null)
             score += boost(store.FullPath[index]);
@@ -281,6 +289,20 @@ public sealed class SearchIndex
     }
 
     private static bool IsCjk(char c) => c is >= (char)0x4E00 and <= (char)0x9FFF;
+
+    /// <summary>像哈希的名字：长度 ≥ 8、只含 0-9a-f，且至少有一个数字。</summary>
+    private static bool LooksLikeHash(ReadOnlySpan<char> name)
+    {
+        if (name.Length < 8) return false;
+        bool hasDigit = false;
+        foreach (var c in name)
+        {
+            if (c is >= '0' and <= '9') { hasDigit = true; continue; }
+            if (c is >= 'a' and <= 'f') continue;
+            return false;
+        }
+        return hasDigit;
+    }
 
     private static bool IsAsciiLettersOrDigits(string s)
     {

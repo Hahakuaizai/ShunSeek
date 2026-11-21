@@ -284,6 +284,9 @@ public sealed class IndexService : IDisposable
         var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var list = new List<string>
         {
+            // 微信 4.x 的聊天数据/缓存：几十万个 wx 开头的哈希目录，搜什么都盖住
+            Path.Combine(roaming, "Tencent", "xwechat", "radium"),
+            Path.Combine(roaming, "Tencent", "WeChat", "All Users"),
             Path.Combine(local, "Temp"),
             Path.Combine(local, "Packages"),
             Path.Combine(local, "Microsoft", "Windows"),
