@@ -2,49 +2,19 @@
 <#
   生成应用图标 src/ShunSeek.App/Assets/app.ico
 
-  风格：手绘线稿。透明底，只有墨线——一圈手抖的方圆轮廓 + 一枚放大镜，
-  线条画两遍（第二遍偏一点、更淡），像铅笔勾的稿子。不填色、不做渐变、不做投影。
-  多尺寸（256/96/64/48/32/16）各自绘制后打进一个 ICO；小尺寸减少抖动、只描一遍，避免糊成马赛克。
+  方案 A：深石墨色圆角方块（超椭圆，不是正圆弧）+ 白色几何放大镜。
+  纯色平涂，没有渐变、没有描边光晕，小尺寸也认得出。
+  多尺寸（256/96/64/48/32/16）各自绘制后打进一个 ICO；小尺寸把线加粗一点，避免缩下去就散。
 #>
 param([string]$OutputPath = (Join-Path $PSScriptRoot '..\src\ShunSeek.App\Assets\app.ico'))
 
 Add-Type -AssemblyName System.Drawing
 
-$inkColor = [System.Drawing.Color]::FromArgb(255, 32, 32, 34)
-
-function New-WobbleCircle {
-    param([double]$cx, [double]$cy, [double]$r, [double]$amp, [int]$segments, [double]$phase)
-    $pts = New-Object 'System.Collections.Generic.List[System.Drawing.PointF]'
-    for ($i = 0; $i -lt $segments; $i++) {
-        $a = 2 * [Math]::PI * $i / $segments
-        $w = 1 + $amp * (0.6 * [Math]::Sin(3 * $a + $phase) + 0.4 * [Math]::Sin(5 * $a + $phase * 2.7))
-        $pts.Add([System.Drawing.PointF]::new([single]($cx + $r * $w * [Math]::Cos($a)),
-                                             [single]($cy + $r * $w * [Math]::Sin($a))))
-    }
-    $pts.Add($pts[0])
-    return , ([System.Drawing.PointF[]]$pts.ToArray())
-}
-
-# 手绘方圆轮廓：超椭圆采样 + 抖动（不是正圆弧，也不是正圆）
-function New-WobbleSquircle {
-    param([double]$cx, [double]$cy, [double]$a, [double]$n, [double]$amp, [int]$segments, [double]$phase)
-    $pts = New-Object 'System.Collections.Generic.List[System.Drawing.PointF]'
-    $p = 2.0 / $n
-    for ($i = 0; $i -lt $segments; $i++) {
-        $t = 2 * [Math]::PI * $i / $segments
-        $cos = [Math]::Cos($t)
-        $sin = [Math]::Sin($t)
-        $w = 1 + $amp * (0.6 * [Math]::Sin(3 * $t + $phase) + 0.4 * [Math]::Sin(5 * $t + $phase * 2.1))
-        $x = $cx + $a * $w * [Math]::Sign($cos) * [Math]::Pow([Math]::Abs($cos), $p)
-        $y = $cy + $a * $w * [Math]::Sign($sin) * [Math]::Pow([Math]::Abs($sin), $p)
-        $pts.Add([System.Drawing.PointF]::new([single]$x, [single]$y))
-    }
-    $pts.Add($pts[0])
-    return , ([System.Drawing.PointF[]]$pts.ToArray())
-}
-
 $sizes = 256, 96, 64, 48, 32, 16
 $pngs = @()
+
+$ink = [System.Drawing.Color]::FromArgb(255, 26, 28, 32)     # 底：#1A1C20
+$white = [System.Drawing.Color]::FromArgb(255, 255, 255, 255)
 
 foreach ($size in $sizes) {
     $bmp = New-Object System.Drawing.Bitmap $size, $size
@@ -52,65 +22,56 @@ foreach ($size in $sizes) {
     $g.SmoothingMode = 'AntiAlias'
     $g.Clear([System.Drawing.Color]::Transparent)
 
-    $sketch = $size -ge 48            # 大尺寸画两遍，小的只描一遍，16px 才不糊
-    $jitter = if ($size -ge 64) { 0.028 } elseif ($size -ge 32) { 0.012 } else { 0.0 }
-    $segments = if ($size -ge 96) { 96 } elseif ($size -ge 32) { 48 } else { 28 }
+    # 超椭圆底（n=3.2，比方圆更饱满，比正方更柔和）
+    $cx = $size / 2.0
+    $cy = $size / 2.0
+    $a = $size * 0.5
+    $n = 3.2
+    $p = 2.0 / $n
+    $pts = New-Object 'System.Collections.Generic.List[System.Drawing.PointF]'
+    $segments = if ($size -ge 32) { 128 } else { 64 }
+    for ($i = 0; $i -lt $segments; $i++) {
+        $t = 2 * [Math]::PI * $i / $segments
+        $cos = [Math]::Cos($t)
+        $sin = [Math]::Sin($t)
+        $px = $cx + $a * [Math]::Sign($cos) * [Math]::Pow([Math]::Abs($cos), $p)
+        $py = $cy + $a * [Math]::Sign($sin) * [Math]::Pow([Math]::Abs($sin), $p)
+        $pts.Add([System.Drawing.PointF]::new([single]$px, [single]$py))
+    }
+    $pts.Add($pts[0])
 
-    # ① 外轮廓：手抖的方圆
-    $outlineWidth = [Math]::Max(1.2, $size * 0.030)
-    $outlinePen = New-Object System.Drawing.Pen $inkColor, ([single]$outlineWidth)
-    $outlinePen.LineJoin = 'Round'
-    $outline = New-WobbleSquircle -cx ($size / 2) -cy ($size / 2) -a ($size * 0.455) -n 3.1 -amp $jitter -segments $segments -phase 1.9
-    $g.DrawClosedCurve($outlinePen, $outline, 0.4, 'Winding')
+    $fill = New-Object System.Drawing.SolidBrush $ink
+    $g.FillPolygon($fill, [System.Drawing.PointF[]]$pts.ToArray())
 
-    # ② 放大镜：镜片
-    $lensR = $size * 0.185
-    $cx = $size * 0.445
-    $cy = $size * 0.435
-    $stroke = [Math]::Max(1.5, $size * 0.058)
-    $pen = New-Object System.Drawing.Pen $inkColor, ([single]$stroke)
+    # 放大镜：镜片 + 45° 手柄
+    $lensR = $size * 0.200
+    $lcx = $size * 0.440
+    $lcy = $size * 0.440
+    # 小尺寸线要相对粗一点，否则 16px 缩下去只剩灰点
+    $strokeRatio = if ($size -le 32) { 0.095 } else { 0.072 }
+    $stroke = [Math]::Max(1.4, $size * $strokeRatio)
+
+    $pen = New-Object System.Drawing.Pen $white, ([single]$stroke)
     $pen.StartCap = 'Round'
     $pen.EndCap = 'Round'
     $pen.LineJoin = 'Round'
 
-    $lens = New-WobbleCircle -cx $cx -cy $cy -r $lensR -amp ($jitter * 1.6) -segments $segments -phase 0.7
-    $g.DrawClosedCurve($pen, $lens, 0.42, 'Winding')
+    $g.DrawEllipse($pen, [single]($lcx - $lensR), [single]($lcy - $lensR), [single](2 * $lensR), [single](2 * $lensR))
 
-    # ③ 手柄
-    $hx0 = $cx + $lensR * 0.70
-    $hy0 = $cy + $lensR * 0.70
-    $hx2 = $hx0 + $size * 0.155
-    $hy2 = $hy0 + $size * 0.155
-    $g.DrawCurve($pen, [System.Drawing.PointF[]]@(
-        [System.Drawing.PointF]::new([single]$hx0, [single]$hy0),
-        [System.Drawing.PointF]::new([single](($hx0 + $hx2) / 2 + $size * 0.010), [single](($hy0 + $hy2) / 2)),
-        [System.Drawing.PointF]::new([single]$hx2, [single]$hy2)), 0.3)
-
-    # ④ 第二遍淡描（只在大尺寸上）
-    if ($sketch) {
-        $ghostPen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(80, 32, 32, 34)), ([single]($stroke * 0.65))
-        $ghostPen.StartCap = 'Round'
-        $ghostPen.EndCap = 'Round'
-        $ghostPen.LineJoin = 'Round'
-        $ghostLens = New-WobbleCircle -cx ($cx + $size * 0.008) -cy ($cy - $size * 0.006) -r ($lensR * 1.03) -amp ($jitter * 2.0) -segments $segments -phase 2.6
-        $g.DrawClosedCurve($ghostPen, $ghostLens, 0.42, 'Winding')
-
-        $ghostOutlinePen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(70, 32, 32, 34)), ([single]($outlineWidth * 0.8))
-        $ghostOutlinePen.LineJoin = 'Round'
-        $ghostOutline = New-WobbleSquircle -cx ($size / 2 + $size * 0.004) -cy ($size / 2 - $size * 0.003) -a ($size * 0.462) -n 3.1 -amp ($jitter * 1.4) -segments $segments -phase 3.4
-        $g.DrawClosedCurve($ghostOutlinePen, $ghostOutline, 0.4, 'Winding')
-
-        $ghostPen.Dispose(); $ghostOutlinePen.Dispose()
-    }
+    $from = $lensR * 0.72
+    $to = $lensR * 1.58
+    $g.DrawLine($pen,
+        [single]($lcx + $from * 0.707), [single]($lcy + $from * 0.707),
+        [single]($lcx + $to * 0.707), [single]($lcy + $to * 0.707))
 
     $ms = New-Object System.IO.MemoryStream
     $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
     $pngs += , @{ Size = $size; Bytes = $ms.ToArray() }
 
-    $ms.Dispose(); $pen.Dispose(); $outlinePen.Dispose(); $g.Dispose(); $bmp.Dispose()
+    $ms.Dispose(); $pen.Dispose(); $fill.Dispose(); $g.Dispose(); $bmp.Dispose()
 }
 
-# 组装 ICO（PNG 负载，Windows Vista+ 支持）
+# 组装 ICO（PNG 负载）
 $out = New-Object System.IO.MemoryStream
 $bw = New-Object System.IO.BinaryWriter $out
 $bw.Write([UInt16]0)
