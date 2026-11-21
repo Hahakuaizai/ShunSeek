@@ -5,6 +5,7 @@
         xmlns:ctl="clr-namespace:ShunSeek.App.Controls"
         xmlns:system="clr-namespace:System;assembly=System.Runtime"
         Title="瞬觅 ShunSeek"
+        Icon="pack://application:,,,/Assets/app.ico"
         Width="700" Height="500"
         WindowStartupLocation="Manual"
         WindowBackdropType="Mica"

@@ -21,6 +21,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- 图标同时作为托管资源：托盘和窗口从 pack URI 取，开发期（dotnet run）也有图标，
+         不用去猜 exe 资源 -->
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- WPF-UI（lepoco/wpfui）：提供 FluentWindow + Mica 背景 + Fluent 控件样式，
          是这个壳子"像 DeskBox 一样好看"的关键依赖。
          注意包名是 WPF-UI（带连字符），"Wpf.Ui"/3.0.5 那套是老的 .NET Framework 包，

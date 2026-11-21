@@ -35,14 +35,76 @@ public sealed class TrayIconManager : IDisposable
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => onExit());
 
+        var appIcon = LoadAppIcon();
+        App.Log("tray icon: " + (appIcon == null ? "fallback(系统默认)" : "loaded(" + appIcon.Width + "px)"));
+
         _icon = new NotifyIcon
         {
-            Text = "瞬觅 ShunSeek",
-            Icon = System.Drawing.SystemIcons.Application, // TODO(阶段5): 换成正式 .ico
+            Text = "瞬觅 ShunSeek", // 注意 NotifyIcon.Text 上限 63 字符
+            Icon = appIcon ?? System.Drawing.SystemIcons.Application,
             ContextMenuStrip = menu,
             Visible = true,
         };
         _icon.DoubleClick += (_, _) => onToggle();
+
+        ShowTrayHintOnce();
+    }
+
+    /// <summary>
+    /// Win11 会把新程序的小图标默认收进 ^ 折叠区，用户会以为"没有托盘图标"。
+    /// 第一次运行时冒个气泡说一声，之后就不打扰了（用一个小文件记状态）。
+    /// </summary>
+    private void ShowTrayHintOnce()
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShunSeek");
+            var flag = Path.Combine(dir, "tray-hint-shown");
+            if (File.Exists(flag)) return;
+
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(flag, DateTime.Now.ToString("O"));
+            _icon.ShowBalloonTip(5000, "瞬觅已在托盘",
+                "Win11 可能把它收进了 ^ 折叠区，拖出来固定一下就好。Alt+Space 呼出搜索。",
+                ToolTipIcon.None);
+        }
+        catch
+        {
+            // 提示失败无所谓，不影响功能
+        }
+    }
+
+    /// <summary>
+    /// 取应用自己的图标：先用打进程序集的托管资源（开发期也有），
+    /// 取不到再退回 exe 关联图标，最后才是系统默认——不能因为图标失败让托盘空着。
+    /// </summary>
+    private static System.Drawing.Icon? LoadAppIcon()
+    {
+        try
+        {
+            var resource = System.Windows.Application.GetResourceStream(
+                new Uri("pack://application:,,,/Assets/app.ico"))?.Stream;
+            if (resource != null)
+            {
+                using (resource) return new System.Drawing.Icon(resource, 32, 32);
+            }
+        }
+        catch
+        {
+            // 资源没打进去（比如换了个构建方式）：往下走
+        }
+
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe)) return System.Drawing.Icon.ExtractAssociatedIcon(exe);
+        }
+        catch
+        {
+        }
+
+        return null;
     }
 
     public void Dispose()
