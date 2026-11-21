@@ -39,8 +39,7 @@ ShunSeek.sln
 │  ├─ Services/                  IconCache / HotkeyManager / TrayIconManager
 │  └─ GlobalUsings.cs            WPF 与 WinForms 同名类型的别名
 ├─ scripts/                      启动脚本
-│  ├─ run.ps1                    pwsh 7 脚本，主入口
-│  └─ run.cmd                    双击用的小壳子（转给 run.ps1）
+│  └─ run.bat                    双击即用（纯批处理，不依赖 PowerShell / bash）
 └─ docs/
    ├─ 开发流程.md                分 6 阶段的开发指导
    └─ ui-mockup.html             弹窗 UI 目标稿
@@ -48,18 +47,18 @@ ShunSeek.sln
 
 ## 跑起来
 
-```powershell
-pwsh -File .\run.ps1            # Debug 编译并启动（托盘常驻，Alt+Space 呼出）
-pwsh -File .\run.ps1 -Show      # 启动后直接把搜索窗弹出来
-pwsh -File .\run.ps1 -Release   # Release
-pwsh -File .\run.ps1 -Bench     # 只跑速度基准
+```bat
+rem 双击 scripts/run.bat         编译 + 启动，并直接把搜索窗弹出来
+scripts/run.bat -Release        用 Release 配置
+scripts/run.bat -NoBuild        不编译，直接启动上次的产物
+scripts/run.bat -BuildOnly      只编译
+scripts/run.bat -Bench          只跑速度基准
+scripts/run.bat -NoShow         启动但不弹窗（只驻留托盘）
 ```
 
-双击 `scripts
-un.cmd` 等价于 `scripts
-un.ps1`。脚本会自动找 dotnet（PATH → `%ProgramFiles%\dotnet` →
-`%USERPROFILE%\.dotnet`），并给子进程补 `DOTNET_ROOT`——dotnet-install 装在用户目录的 SDK
-没登记进系统环境变量，不补这个，双击 exe 会报 "You must install .NET"。
+脚本自己找 dotnet（PATH → `%ProgramFiles%\dotnet` → `%USERPROFILE%\.dotnet`）并补上
+`DOTNET_ROOT`——dotnet-install 装在用户目录的 SDK 没登记进系统环境变量，不补这个，
+双击 exe 会报 "You must install .NET"。启动前会先结束已在跑的实例（程序是单实例的）。
 
 在 VS 2022 里直接 F5 也行（.NET 桌面开发工作负载 + 自动还原 WPF-UI）。
 
