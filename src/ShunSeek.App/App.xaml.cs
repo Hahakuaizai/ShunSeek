@@ -56,7 +56,7 @@ public partial class App : System.Windows.Application
         var pinned = PinnedStore.Load(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ShunSeek", "pinned.json"));
-        _index = new IndexService(usage);
+        _index = new IndexService(usage) { Log = Log };
 
         var viewModel = new MainViewModel();
         var window = new MainWindow { DataContext = viewModel };
@@ -82,7 +82,7 @@ public partial class App : System.Windows.Application
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         _showWait = ThreadPool.RegisterWaitForSingleObject(
             _showEvent,
-            (_, _) => Dispatcher.BeginInvoke(() => window.ToggleShow()),
+            (_, _) => Dispatcher.BeginInvoke(() => window.ShowWindow()),
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
@@ -98,11 +98,16 @@ public partial class App : System.Windows.Application
                 initialQuery = e.Args[i + 1];
         }
 
-        if (e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase) || initialQuery != null)
+        // 双击图标/直接运行 = 就是要用，直接把窗口弹出来（以前只有 --show 才弹，
+        // 结果双击后只在托盘里躺着，像没启动一样）。开机自启带 --tray，安静地待在托盘。
+        bool silent = e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase)
+                   || e.Args.Contains("--silent", StringComparer.OrdinalIgnoreCase);
+
+        if (!silent)
         {
             Dispatcher.BeginInvoke(() =>
             {
-                window.ToggleShow();
+                window.ShowWindow();
                 if (initialQuery != null) window.ApplyInitialQuery(initialQuery);
             });
         }

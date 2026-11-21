@@ -59,6 +59,14 @@ public partial class MainWindow
             return;
         }
 
+        ShowWindow();
+    }
+
+    /// <summary>把窗口叫出来（已在屏上也照样置前，不隐藏）。</summary>
+    public void ShowWindow()
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
         PositionWindow();
         Show();
         _shownAtTicks = Environment.TickCount64;
@@ -110,13 +118,25 @@ public partial class MainWindow
     private void MaximizeButton_Click(object sender, RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    private const int WM_NCLBUTTONDOWN = 0xA1;
+    private const int HTCAPTION = 2;
+
     /// <summary>
-    /// 拖动窗口：顶栏整条都能拖（输入框和按钮上的鼠标事件不拦，否则点不动）。
-    /// 双击顶栏 = 最大化/还原，和普通窗口一致。
+    /// 拖动窗口：整块面板的空白处都能拖（输入框、按钮、列表里不拖）。
+    /// 用 WM_NCLBUTTONDOWN + HTCAPTION 让系统自己接管拖拽，比 DragMove() 稳——
+    /// 无标题栏 + WindowChrome 的组合下 DragMove 经常直接不生效。
+    /// 双击空白处 = 最大化/还原。
     /// </summary>
-    private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void Root_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is DependencyObject source && IsInteractive(source)) return;
+        if (e.OriginalSource is not DependencyObject source) return;
+        if (IsInteractive(source) || IsInsideList(source)) return;
 
         if (e.ClickCount == 2)
         {
@@ -124,8 +144,20 @@ public partial class MainWindow
             return;
         }
 
-        try { DragMove(); }
-        catch { /* 拖拽过程中松开鼠标会抛，忽略 */ }
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        ReleaseCapture();
+        SendMessage(handle, WM_NCLBUTTONDOWN, HTCAPTION, IntPtr.Zero);
+    }
+
+    /// <summary>点在结果列表/滚动条上时不要拖动窗口，否则选不中条目。</summary>
+    private static bool IsInsideList(DependencyObject source)
+    {
+        for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ListBox or System.Windows.Controls.Primitives.ScrollBar) return true;
+        }
+        return false;
     }
 
     /// <summary>点在输入框/按钮上时不要触发窗口拖动。</summary>
@@ -142,8 +174,8 @@ public partial class MainWindow
     private void Window_StateChanged(object? sender, EventArgs e)
     {
         bool maximized = WindowState == WindowState.Maximized;
-        MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
-        RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
+        if (MaximizeGlyph != null) MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
+        if (RestoreGlyph != null) RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
 
         // 最大化时把外层圆角收掉，否则屏幕四角会露出底色
         if (RootPanel != null) RootPanel.Radius = maximized ? 0 : 28;

@@ -91,6 +91,9 @@ scripts/run.bat -NoShow         启动但不弹窗（只驻留托盘）
 - 类型筛选收进漏斗按钮里的**多级菜单**：应用程序（软件/快捷方式/安装目录）、
   文件（文档/图片/视频/音频/压缩包/代码/程序）、文件夹、其他。
 - 键盘：↑↓←→ 走格子、Enter 打开、Ctrl+Enter 定位、Ctrl+C 复制路径、Esc 收起。
+- **启动即用**：索引会存一份磁盘缓存（`%LocalAppData%\ShunSeek\index.cache`），
+  下次启动直接读回来，窗口约 1 秒出现、索引立刻可搜；缓存超过一天才在后台重扫。
+- 双击图标直接弹窗（开机自启带 `--tray`，安静待托盘）；再双击一次会把已运行的窗口叫到前面。
 - 窗口是正常窗口：顶栏空白处可拖动（双击最大化/还原），四边可拉伸，
   右上角有最小化/最大化/关闭。不再"失焦自动隐藏"——那样没法拖着改大小。
 
@@ -106,7 +109,18 @@ scripts/run.bat -NoShow         启动但不弹窗（只驻留托盘）
 两种档位都会额外扫「软件/快捷方式/安装目录」（读注册表 Uninstall + 开始菜单，不需要管理员）。
 状态栏会写明当前是哪一档、索引了多少条、增量多少条、最后一次更新是什么时候。
 
-## 打包与安装
+## 打包
+
+发布用**文件夹**方式（不是单文件 exe）：160MB 的单文件每次启动都要把原生库解压到临时目录，
+冷启动要好几秒；文件夹 + ReadyToRun 冷启动约 1 秒。
+
+```powershell
+dotnet publish src/ShunSeek.App -c Release -r win-x64 --self-contained true `
+  -p:PublishSingleFile=false -p:PublishReadyToRun=true -o publish/win-x64-app
+```
+
+把 `publish/win-x64-app/*` 整个复制到 `E:\Apps\ShunSeek\`，快捷方式仍指向其中的 `ShunSeek.exe`。
+与安装
 
 ```bat
 rem 自包含单文件（目标机器不用装 .NET），产物在 publish\win-x64\ShunSeek.exe

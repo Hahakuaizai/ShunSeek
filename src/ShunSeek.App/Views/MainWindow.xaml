@@ -170,7 +170,7 @@
                 </Rectangle.Fill>
             </Rectangle>
 
-            <Grid>
+            <Grid Background="Transparent" MouseLeftButtonDown="Root_MouseLeftButtonDown">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -179,8 +179,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- ① 搜索栏 + 筛选 + 关闭 -->
-                <Grid Grid.Row="0" Margin="22,20,18,4" Background="Transparent"
-                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Grid.Row="0" Margin="22,20,18,4" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />

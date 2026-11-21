@@ -37,6 +37,23 @@ public sealed class IndexStore
     public string[] DisplayName { get; private init; } = Array.Empty<string>();
     public string[] FullPath { get; private init; } = Array.Empty<string>();
 
+    /// <summary>给缓存恢复用：直接从现成数组装配一个只读索引，不做任何转换。</summary>
+    internal static IndexStore FromArrays(
+        char[] nameArena, int[] nameOffset, int[] nameLength,
+        char[] initialsArena, int[] initialsOffset, int[] initialsLength,
+        char[] pinyinArena, int[] pinyinOffset, int[] pinyinLength,
+        byte[] category, int[] parentRef, ulong[] fileRef,
+        string[] displayName, string[] fullPath)
+        => new()
+        {
+            Count = displayName.Length,
+            NameArena = nameArena, NameOffset = nameOffset, NameLength = nameLength,
+            InitialsArena = initialsArena, InitialsOffset = initialsOffset, InitialsLength = initialsLength,
+            PinyinArena = pinyinArena, PinyinOffset = pinyinOffset, PinyinLength = pinyinLength,
+            Category = category, ParentRef = parentRef, FileRef = fileRef,
+            DisplayName = displayName, FullPath = fullPath,
+        };
+
     public ReadOnlySpan<char> LowerName(int i) => NameArena.AsSpan(NameOffset[i], NameLength[i]);
     public ReadOnlySpan<char> Initials(int i) => InitialsArena.AsSpan(InitialsOffset[i], InitialsLength[i]);
     public ReadOnlySpan<char> FullPinyin(int i) => PinyinArena.AsSpan(PinyinOffset[i], PinyinLength[i]);

@@ -142,7 +142,7 @@ internal static class StartupRegistration
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true);
             if (key == null) return;
-            if (enabled) key.SetValue(ValueName, ExecutableCommand());
+            if (enabled) key.SetValue(ValueName, StartupCommand());
             else key.DeleteValue(ValueName, throwOnMissingValue: false);
         }
         catch
@@ -152,6 +152,9 @@ internal static class StartupRegistration
     }
 
     /// <summary>注册表里要写的命令行。dotnet run 调试时进程是 dotnet.exe，得补上 dll 路径。</summary>
+    /// <summary>开机自启的命令行：带 --tray，开机时安静进托盘，不弹窗。</summary>
+    private static string StartupCommand() => ExecutableCommand() + " --tray";
+
     private static string ExecutableCommand()
     {
         var exe = Environment.ProcessPath;

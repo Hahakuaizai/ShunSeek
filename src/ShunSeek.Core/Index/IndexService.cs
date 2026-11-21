@@ -70,9 +70,14 @@ public sealed class IndexService : IDisposable
     private volatile bool _disposed;
     private volatile IndexStatus _status = IndexStatus.Booting;
 
-    public IndexService(UsageStore usage)
+    private readonly string _cachePath;
+    private int _cacheSaving;
+    private DateTime? _cacheBuiltAt;
+
+    public IndexService(UsageStore usage, string? cachePath = null)
     {
         _usage = usage;
+        _cachePath = cachePath ?? IndexCache.DefaultPath;
         Engine = new SearchEngine(SearchIndex.Empty, usage);
         _flushTimer = new Timer(_ => Flush(), null, FlushIntervalMs, FlushIntervalMs);
     }
@@ -86,7 +91,84 @@ public sealed class IndexService : IDisposable
     /// <summary>状态变化（进度、增量更新、重建完成、错误）。可能来自后台线程，UI 端自己切回 UI 线程。</summary>
     public event Action<IndexStatus>? StatusChanged;
 
-    public Task StartAsync() => RebuildAsync("建立索引");
+    /// <summary>
+    /// 启动：先尝试吃磁盘缓存（几十万条也就几百毫秒），缓存可用就立刻"就绪"，
+    /// 用户双击后马上能搜；缓存太旧/范围对不上才在后台重新建。
+    /// </summary>
+    public async Task StartAsync()
+    {
+        if (TryStartFromCache()) return;
+
+        // 没有缓存：第一次启动只能老实扫一遍，扫完顺手把缓存写出来
+        await RebuildAsync("建立索引").ConfigureAwait(false);
+        SaveCache();
+    }
+
+    /// <summary>命中缓存就直接接管索引，返回 false 表示没有可用缓存。</summary>
+    private bool TryStartFromCache()
+    {
+        var cached = IndexCache.TryLoad(_cachePath);
+        if (cached == null) return false;
+
+        _base = cached.Store;
+        _mode = IndexMode.Portable;
+        _scope = cached.Scope;
+        _cacheBuiltAt = cached.BuiltAt;
+        _lastBuildAt = cached.BuiltAt;
+        _lastUpdateAt = cached.BuiltAt;
+
+        Engine.Swap(new SearchIndex(_base, IndexStore.Empty, null, null, null));
+        StartWatchers();
+
+        var age = DateTime.Now - cached.BuiltAt;
+        bool stale = age > TimeSpan.FromHours(24);
+
+        Publish(new IndexStatus(
+            Ready: true, Building: false, Mode: _mode,
+            EntryCount: _base.Count, DeltaCount: 0, DeadCount: 0,
+            Scope: _scope,
+            Message: $"缓存索引 · {cached.BuiltAt:HH:mm} · {_base.Count:N0} 条" + (stale ? "（后台更新中）" : ""),
+            LastBuildAt: _lastBuildAt, LastUpdateAt: _lastUpdateAt));
+
+        // 缓存超过一天：先用着，过一会儿在后台重扫一遍，免得漏掉关机期间的改动
+        if (stale) ScheduleRebuild("缓存过期，后台刷新", delaySeconds: 15);
+        return true;
+    }
+
+    /// <summary>把当前索引写进磁盘缓存（后台线程，不挡 UI）。</summary>
+    private void SaveCache()
+    {
+        if (_base.Count == 0) return;
+        if (Interlocked.Exchange(ref _cacheSaving, 1) == 1) return;
+
+        var store = _base;
+        var scope = _scope;
+        var builtAt = _lastBuildAt ?? DateTime.Now;
+        var path = _cachePath;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                IndexCache.Save(path, store, scope, builtAt);
+                AppLog($"[cache] saved {store.Count:N0} entries in {sw.ElapsedMilliseconds}ms");
+            }
+            catch (Exception ex)
+            {
+                AppLog("[cache] save failed: " + ex.Message);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _cacheSaving, 0);
+            }
+        });
+    }
+
+    /// <summary>诊断日志出口，App 会接到自己的日志文件里。</summary>
+    public Action<string>? Log { get; set; }
+
+    private void AppLog(string message) => Log?.Invoke(message);
 
     /// <summary>
     /// 整表重建：重新读 MFT / 遍历目录，建好后原子换掉搜索快照。
@@ -132,6 +214,8 @@ public sealed class IndexService : IDisposable
                 Scope: _scope,
                 Message: $"{reason}完成 · {sw.Elapsed.TotalSeconds:F1}s · {_base.Count:N0} 条",
                 LastBuildAt: _lastBuildAt, LastUpdateAt: _lastUpdateAt));
+
+            SaveCache();
         }
         catch (OperationCanceledException)
         {
