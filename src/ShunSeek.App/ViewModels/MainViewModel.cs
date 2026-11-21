@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using ShunSeek.App.Services;
 using ShunSeek.Core;
 
 namespace ShunSeek.App;
@@ -21,6 +22,11 @@ public sealed class ResultItemViewModel : INotifyPropertyChanged
     public int StoreIndex { get; init; }
 
     public bool IsDirectory { get; init; }
+
+    /// <summary>是否"固定"在首页（右上角会挂一个小别针）。</summary>
+    public bool IsPinned { get; init; }
+
+    public Visibility PinVisibility => IsPinned ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>可打开的路径。软件条目偶尔只有名字（注册表没写 InstallLocation），这种行不给打开。</summary>
     public bool HasPath => !string.IsNullOrEmpty(Path);
@@ -65,12 +71,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _resultText = string.Empty;
     private string _emptyHintText = "输入关键词开始搜索";
     private Visibility _emptyHintVisibility = Visibility.Visible;
+    private string _homeCaption = string.Empty;
+    private Visibility _homeCaptionVisibility = Visibility.Collapsed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ResultItemViewModel> Results { get; } = new();
 
     public IndexService? Service { get; private set; }
+
+    public PinnedStore? Pinned { get; private set; }
 
     public string Query
     {
@@ -98,6 +108,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         private set { _emptyHintVisibility = value; OnPropertyChanged(); }
     }
 
+    /// <summary>首页标题行（"已固定 3 · 最近 5"），只在空查询且有内容时出现。</summary>
+    public string HomeCaption
+    {
+        get => _homeCaption;
+        private set { _homeCaption = value; OnPropertyChanged(); }
+    }
+
+    public Visibility HomeCaptionVisibility
+    {
+        get => _homeCaptionVisibility;
+        private set { _homeCaptionVisibility = value; OnPropertyChanged(); }
+    }
+
     /// <summary>状态栏中间：本次查询命中数与耗时。</summary>
     public string ResultText
     {
@@ -106,9 +129,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>索引服务就绪后由 App 调一次。</summary>
-    public void Attach(IndexService service)
+    public void Attach(IndexService service, PinnedStore pinned)
     {
         Service = service;
+        Pinned = pinned;
         _engine = service.Engine;
         _usage = service.Usage;
         ApplyStatus(service.Status);
@@ -139,6 +163,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public EntryCategory? Category => _category;
+
+    /// <summary>固定到首页（右键菜单"添加到首页"）。</summary>
+    public void Pin(ResultItemViewModel item)
+    {
+        if (!item.HasPath) return;
+        Pinned?.Add(item.Path);
+        ScheduleSearch();
+    }
+
+    public void Unpin(ResultItemViewModel item)
+    {
+        if (!item.HasPath) return;
+        Pinned?.Remove(item.Path);
+        ScheduleSearch();
+    }
+
+    public bool IsPinned(ResultItemViewModel item) => item.HasPath && Pinned?.Contains(item.Path) == true;
 
     /// <summary>用户打开了某个结果：记一次频次（影响以后排序），并顺手落盘。</summary>
     public void RecordOpened(ResultItemViewModel item)
@@ -175,12 +216,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         List<ResultItemViewModel> items;
         string resultText;
+        string homeCaption = string.Empty;
         try
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                items = await Task.Run(() => BuildLauncherItems(_usage, token), token);
+                var home = await Task.Run(() => BuildHomeItems(_usage, Pinned, token), token);
+                items = home.Items;
                 resultText = string.Empty;
+                homeCaption = home.PinnedCount > 0
+                    ? $"已固定 {home.PinnedCount} · 最近使用 {home.RecentCount}"
+                    : home.RecentCount > 0 ? $"最近使用 {home.RecentCount}" : string.Empty;
             }
             else
             {
@@ -208,6 +254,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 ? "输入关键词开始搜索"
                 : "没有匹配的内容";
             EmptyHintVisibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            HomeCaption = homeCaption;
+            HomeCaptionVisibility = homeCaption.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             // 图标另起炉灶：先占位，再逐个替换
             foreach (var item in items) LoadIcon(item);
@@ -215,19 +263,37 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 空查询时只显示"最近打开过的几条"（最多 8 条），不把整个软件列表铺到首页——
-    /// 启动器的第一屏应该是干净的，用户想找什么自己输入。
+    /// 首页 = 已固定的（用户自己挑出来的文件夹/图片/软件）+ 最近打开过的，最多 12 格。
+    /// 固定项排前面，并且打上别针；最近使用里跟固定项重复的不再重复出现。
     /// </summary>
-    private static List<ResultItemViewModel> BuildLauncherItems(UsageStore? usage, CancellationToken token)
+    private (List<ResultItemViewModel> Items, int PinnedCount, int RecentCount) BuildHomeItems(
+        UsageStore? usage, PinnedStore? pinned, CancellationToken token)
     {
-        const int limit = 8;
+        const int limit = 12;
         var items = new List<ResultItemViewModel>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int pinnedCount = 0;
+
+        foreach (var path in pinned?.Paths ?? Array.Empty<string>())
+        {
+            token.ThrowIfCancellationRequested();
+            if (items.Count >= limit) break;
+            if (!seen.Add(path)) continue;
+            items.Add(FromPath(path, isPinned: true));
+            pinnedCount++;
+        }
+
+        int recentCount = 0;
         foreach (var path in usage?.TopPaths(limit) ?? Array.Empty<string>())
         {
             token.ThrowIfCancellationRequested();
+            if (items.Count >= limit) break;
+            if (!seen.Add(path)) continue;
             items.Add(FromPath(path));
+            recentCount++;
         }
-        return items;
+
+        return (items, pinnedCount, recentCount);
     }
 
     private void LoadIcon(ResultItemViewModel item)
@@ -273,7 +339,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         };
     }
 
-    private static ResultItemViewModel FromPath(string path)
+    private static ResultItemViewModel FromPath(string path, bool isPinned = false)
     {
         var isDir = SafeIsDirectory(path);
         var cat = isDir ? EntryCategory.Folder : CategoryClassifier.ClassifyByExtension(path);
@@ -287,6 +353,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             CategoryLabel = EntryCategoryNames.DisplayName(cat),
             StoreIndex = -1,
             IsDirectory = isDir,
+            IsPinned = isPinned,
         };
     }
 

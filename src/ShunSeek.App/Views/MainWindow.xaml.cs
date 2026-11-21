@@ -224,6 +224,56 @@ public partial class MainWindow
     private void ResultsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         => OpenSelected(locateInExplorer: false);
 
+    /// <summary>右键：选中被点的那一格，再弹"打开 / 定位 / 复制路径 / 添加到首页"。</summary>
+    private void ResultsList_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        var hit = ResultsList.InputHitTest(e.GetPosition(ResultsList)) as DependencyObject;
+        while (hit != null && hit is not ListBoxItem) hit = VisualTreeHelper.GetParent(hit);
+        if (hit is ListBoxItem container) container.IsSelected = true;
+
+        ShowItemMenu();
+        e.Handled = true;
+    }
+
+    private void ShowItemMenu()
+    {
+        var item = SelectedItem();
+        if (item == null) return;
+
+        var vm = ViewModel;
+        var menu = new ContextMenu();
+
+        var open = new MenuItem { Header = "打开" };
+        open.Click += (_, _) => OpenSelected(locateInExplorer: false);
+        menu.Items.Add(open);
+
+        var locate = new MenuItem { Header = "打开所在位置" };
+        locate.Click += (_, _) => OpenSelected(locateInExplorer: true);
+        menu.Items.Add(locate);
+
+        var copy = new MenuItem { Header = "复制路径" };
+        copy.Click += (_, _) => CopySelectedPath();
+        menu.Items.Add(copy);
+
+        menu.Items.Add(new Separator());
+
+        if (vm.IsPinned(item))
+        {
+            var unpin = new MenuItem { Header = "从首页移除" };
+            unpin.Click += (_, _) => vm.Unpin(item);
+            menu.Items.Add(unpin);
+        }
+        else
+        {
+            var pin = new MenuItem { Header = "添加到首页" };
+            pin.Click += (_, _) => vm.Pin(item);
+            menu.Items.Add(pin);
+        }
+
+        menu.PlacementTarget = ResultsList;
+        menu.IsOpen = true;
+    }
+
     private void CopySelectedPath()
     {
         if (SelectedItem() is not { HasPath: true } item) return;

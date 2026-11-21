@@ -34,9 +34,10 @@ ShunSeek.sln
 ├─ src/ShunSeek.Bench/           速度基准：合成 200 万条目 → 建索引 → 跑查询集
 ├─ src/ShunSeek.App/             WPF 界面壳
 │  ├─ App.xaml(.cs)              单实例、托盘、热键、崩溃日志
-│  ├─ Views/                     MainWindow（图标网格 + 搜索栏）
-│  ├─ ViewModels/                MainViewModel（结果、状态、异步图标）
-│  ├─ Services/                  IconCache / HotkeyManager / TrayIconManager
+│  ├─ Views/                     MainWindow（液态玻璃 + 图标网格）
+│  ├─ Controls/                  LiquidPanel（椭圆角/连续曲率的玻璃面板）
+│  ├─ ViewModels/                MainViewModel（结果、首页固定项、状态、异步图标）
+│  ├─ Services/                  IconCache / PinnedStore / HotkeyManager / TrayIconManager
 │  └─ GlobalUsings.cs            WPF 与 WinForms 同名类型的别名
 ├─ scripts/                      启动脚本
 │  └─ run.bat                    双击即用（纯批处理，不依赖 PowerShell / bash）
@@ -64,9 +65,14 @@ scripts/run.bat -NoShow         启动但不弹窗（只驻留托盘）
 
 ### 界面
 
-- 一屏就是"搜索框 + 图标网格"：图标全部取系统原版（文件夹就是 Windows 的文件夹，
-  程序就是它自己的图标），取不到时只放一块淡占位，不画色块不写字。
-- 第一屏只放最近打开过的 8 条；什么都没有就一句提示，不把整盘东西铺上来。
+液态玻璃：面板用**椭圆角**（水平半径 28 / 垂直 42，也就是常说的连续曲率）而不是正圆弧，
+半透明白渐变压在 Mica 上，里面垫三团柔光斑，一条斜向高光 8 秒扫一趟，边缘再走一条
+1px 渐变描边当玻璃厚度。所有圆角都由 `Controls/LiquidPanel.cs` 自绘几何 + 裁切子元素。
+
+- 图标全部取系统原版（文件夹就是 Windows 的文件夹，程序就是它自己的图标），
+  取不到时只放一块淡占位，不画色块不写字。
+- **首页 = 已固定 + 最近使用**：标题行显示「已固定 N · 最近使用 M」，固定项带别针标记。
+- 结果上右键：打开 / 打开所在位置 / 复制路径 / **添加到首页**（或从首页移除）。
 - 类型筛选收进漏斗按钮里的**多级菜单**：应用程序（软件/快捷方式/安装目录）、
   文件（文档/图片/视频/音频/压缩包/代码/程序）、文件夹、其他。
 - 键盘：↑↓←→ 走格子、Enter 打开、Ctrl+Enter 定位、Ctrl+C 复制路径、Esc 收起。

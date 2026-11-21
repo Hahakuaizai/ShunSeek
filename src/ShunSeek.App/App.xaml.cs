@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using ShunSeek.App.Services;
 using ShunSeek.Core;
 
 namespace ShunSeek.App;
@@ -52,13 +53,16 @@ public partial class App : System.Windows.Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ShunSeek", "usage.json");
         var usage = UsageStore.Load(usagePath);
+        var pinned = PinnedStore.Load(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ShunSeek", "pinned.json"));
         _index = new IndexService(usage);
 
         var viewModel = new MainViewModel();
         var window = new MainWindow { DataContext = viewModel };
         MainWindow = window;
 
-        viewModel.Attach(_index);
+        viewModel.Attach(_index, pinned);
         _index.StatusChanged += viewModel.ApplyStatus;
 
         _tray = new TrayIconManager(
