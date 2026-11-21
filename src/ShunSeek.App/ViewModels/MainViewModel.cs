@@ -71,6 +71,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _resultText = string.Empty;
     private string _emptyHintText = "输入关键词开始搜索";
     private Visibility _emptyHintVisibility = Visibility.Visible;
+    private bool _indexReady;
     private string _homeCaption = string.Empty;
     private Visibility _homeCaptionVisibility = Visibility.Collapsed;
 
@@ -150,6 +151,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         StatusText = DescribeIndex(status);
+
+        // 索引刚建好：如果用户已经输了关键词，立刻重跑一次，不用他再敲一遍
+        bool ready = status.Ready && !status.Building;
+        if (ready && !_indexReady)
+        {
+            _indexReady = true;
+            if (!string.IsNullOrWhiteSpace(_query)) ScheduleSearch();
+        }
+        _indexReady = ready;
+
+        // 建索引期间，空状态直接显示进度，别显示"没有匹配的内容"误导人
+        if (!ready && Results.Count == 0)
+        {
+            EmptyHintText = string.IsNullOrEmpty(status.Message) ? "正在建立索引…" : status.Message;
+            EmptyHintVisibility = Visibility.Visible;
+        }
     }
 
     /// <summary>状态栏中间那行的临时提示（"路径已不存在"之类）。</summary>
@@ -252,7 +269,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             // 首页克制一点：有"最近使用"就只放最近几条，什么都没有就留一句提示，不铺满
             EmptyHintText = string.IsNullOrWhiteSpace(query)
                 ? "输入关键词开始搜索"
-                : "没有匹配的内容";
+                : _engine?.Index.Count == 0
+                    ? "索引还在建，等它跑完再搜"
+                    : "没有匹配的内容";
             EmptyHintVisibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeCaption = homeCaption;
             HomeCaptionVisibility = homeCaption.Length > 0 ? Visibility.Visible : Visibility.Collapsed;

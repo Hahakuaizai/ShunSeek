@@ -90,9 +90,22 @@ public partial class App : System.Windows.Application
         Log($"startup: elevated={Environment.IsPrivilegedProcess} args=[{string.Join(' ', e.Args)}]");
         Log($"hotkey registered={_hotkey.Registered}");
 
-        // 开发便利：带 --show 启动时直接把窗口弹出来（正常是等 Alt+Space/托盘）
-        if (e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase))
-            Dispatcher.BeginInvoke(() => window.ToggleShow());
+        // 开发/命令行便利：--show 直接弹窗，--query 关键词 预填并立刻搜一次
+        string? initialQuery = null;
+        for (int i = 0; i < e.Args.Length; i++)
+        {
+            if (string.Equals(e.Args[i], "--query", StringComparison.OrdinalIgnoreCase) && i + 1 < e.Args.Length)
+                initialQuery = e.Args[i + 1];
+        }
+
+        if (e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase) || initialQuery != null)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                window.ToggleShow();
+                if (initialQuery != null) window.ApplyInitialQuery(initialQuery);
+            });
+        }
 
         // 索引在后台建：几秒后状态栏会变成"就绪"，期间窗口已经能呼出（空结果 + 进度提示）
         _ = _index.StartAsync();

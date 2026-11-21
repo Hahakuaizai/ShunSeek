@@ -86,6 +86,13 @@ public partial class MainWindow
         Top = top + height * 0.14;
     }
 
+    /// <summary>启动参数带关键词时预填并立即搜索（--query 微信）。</summary>
+    public void ApplyInitialQuery(string text)
+    {
+        SearchBox.Text = text;
+        SearchBox.CaretIndex = text.Length;
+    }
+
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (DataContext is MainViewModel vm) vm.Query = SearchBox.Text;

@@ -43,7 +43,6 @@ public sealed record IndexStatus(
 public sealed class IndexService : IDisposable
 {
     private const int FlushIntervalMs = 300;
-    private static readonly TimeSpan RebuildDebounce = TimeSpan.FromSeconds(1.5);
 
     private readonly UsageStore _usage;
     private readonly DeltaIndex _delta = new();
@@ -269,6 +268,12 @@ public sealed class IndexService : IDisposable
         Add(Environment.SpecialFolder.CommonDesktopDirectory);
         Add(Environment.SpecialFolder.CommonDocuments);
         Add(Environment.SpecialFolder.CommonStartMenu);
+
+        // 装在各处的软件本体：这两三个目录实测只有两三万条、几秒钟，
+        // 不加的话"搜微信"只能搜到注册表登记的入口，搜不到它目录里的文件。
+        Add(Environment.SpecialFolder.ProgramFiles);
+        Add(Environment.SpecialFolder.ProgramFilesX86);
+        Add(Environment.SpecialFolder.CommonApplicationData);
         return roots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
@@ -501,7 +506,7 @@ public sealed class IndexService : IDisposable
 
             case FsChangeKind.Overflow:
                 _delta.RequestRebuild();
-                ScheduleRebuild("文件监听溢出");
+                ScheduleRebuild("文件监听溢出", delaySeconds: 25);
                 return;
         }
     }
@@ -526,15 +531,24 @@ public sealed class IndexService : IDisposable
         return parent.EndsWith('\\') ? parent + name : parent + "\\" + name;
     }
 
-    private void ScheduleRebuild(string reason)
+    /// <param name="delaySeconds">
+    /// 重建延迟。日志被覆盖/目录改名这种"索引真的错了"给 2 秒就够；
+    /// 监听溢出（高负载下很常见）给久一点，别在建完索引的地动山摇里又立刻重建一次。
+    /// </param>
+    private void ScheduleRebuild(string reason, int delaySeconds = 2)
     {
         if (_disposed) return;
         if (Interlocked.Exchange(ref _rebuildScheduled, 1) == 1) return;
+
+        // 刚建完不到一分钟的那点溢出，多半是建索引期间的正常抖动，等一等再说
+        var delay = TimeSpan.FromSeconds(delaySeconds);
+        if (_lastBuildAt is { } built && DateTime.Now - built < TimeSpan.FromSeconds(60))
+            delay = TimeSpan.FromSeconds(60);
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(RebuildDebounce).ConfigureAwait(false);
+                await Task.Delay(delay).ConfigureAwait(false);
                 await RebuildAsync(reason).ConfigureAwait(false);
             }
             catch
