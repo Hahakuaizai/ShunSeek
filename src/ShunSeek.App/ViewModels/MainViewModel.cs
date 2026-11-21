@@ -72,6 +72,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _emptyHintText = "输入关键词开始搜索";
     private Visibility _emptyHintVisibility = Visibility.Visible;
     private bool _indexReady;
+    private Visibility _homeVisibility = Visibility.Visible;
+    private Visibility _resultsVisibility = Visibility.Collapsed;
     private string _homeCaption = string.Empty;
     private Visibility _homeCaptionVisibility = Visibility.Collapsed;
 
@@ -120,6 +122,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => _homeCaptionVisibility;
         private set { _homeCaptionVisibility = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>空查询时显示图标网格（固定 + 最近），有查询时显示详细列表。</summary>
+    public Visibility HomeVisibility
+    {
+        get => _homeVisibility;
+        private set { _homeVisibility = value; OnPropertyChanged(); }
+    }
+
+    public Visibility ResultsVisibility
+    {
+        get => _resultsVisibility;
+        private set { _resultsVisibility = value; OnPropertyChanged(); }
     }
 
     /// <summary>状态栏中间：本次查询命中数与耗时。</summary>
@@ -267,11 +282,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
             ResultText = resultText;
 
             // 首页克制一点：有"最近使用"就只放最近几条，什么都没有就留一句提示，不铺满
-            EmptyHintText = string.IsNullOrWhiteSpace(query)
-                ? "输入关键词开始搜索"
-                : _engine?.Index.Count == 0
-                    ? "索引还在建，等它跑完再搜"
-                    : "没有匹配的内容";
+            bool searching = !string.IsNullOrWhiteSpace(query);
+            HomeVisibility = searching ? Visibility.Collapsed : Visibility.Visible;
+            ResultsVisibility = searching ? Visibility.Visible : Visibility.Collapsed;
+
+            EmptyHintText = searching
+                ? (_engine?.Index.Count == 0 ? "索引还在建，等它跑完再搜" : "没有匹配的内容")
+                : "输入关键词开始搜索";
             EmptyHintVisibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeCaption = homeCaption;
             HomeCaptionVisibility = homeCaption.Length > 0 ? Visibility.Visible : Visibility.Collapsed;

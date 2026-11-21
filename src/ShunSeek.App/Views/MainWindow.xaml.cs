@@ -24,6 +24,10 @@ public partial class MainWindow
     private long _shownAtTicks;
     private MainViewModel ViewModel => (MainViewModel)DataContext;
 
+    /// <summary>键盘/右键都作用于"当前可见"的那个列表：搜索时是详细列表，空查询时是首页网格。</summary>
+    private ListBox ActiveList =>
+        ViewModel.ResultsVisibility == Visibility.Visible ? ResultsList : HomeGrid;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -217,15 +221,17 @@ public partial class MainWindow
 
     private void MoveSelection(int delta)
     {
-        if (ResultsList.Items.Count == 0) return;
-        SelectIndex(Math.Clamp(ResultsList.SelectedIndex + delta, 0, ResultsList.Items.Count - 1));
+        var list = ActiveList;
+        if (list.Items.Count == 0) return;
+        SelectIndex(Math.Clamp(list.SelectedIndex + delta, 0, list.Items.Count - 1));
     }
 
     private void SelectIndex(int index)
     {
-        if (ResultsList.Items.Count == 0) return;
-        ResultsList.SelectedIndex = Math.Clamp(index, 0, ResultsList.Items.Count - 1);
-        ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+        var list = ActiveList;
+        if (list.Items.Count == 0) return;
+        list.SelectedIndex = Math.Clamp(index, 0, list.Items.Count - 1);
+        list.ScrollIntoView(list.SelectedItem);
     }
 
     private void ResultsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -234,15 +240,16 @@ public partial class MainWindow
     /// <summary>右键：选中被点的那一格，再弹"打开 / 定位 / 复制路径 / 添加到首页"。</summary>
     private void ResultsList_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        var hit = ResultsList.InputHitTest(e.GetPosition(ResultsList)) as DependencyObject;
+        var list = sender as ListBox ?? ActiveList;
+        var hit = list.InputHitTest(e.GetPosition(list)) as DependencyObject;
         while (hit != null && hit is not ListBoxItem) hit = VisualTreeHelper.GetParent(hit);
         if (hit is ListBoxItem container) container.IsSelected = true;
 
-        ShowItemMenu();
+        ShowItemMenu(list);
         e.Handled = true;
     }
 
-    private void ShowItemMenu()
+    private void ShowItemMenu(ListBox anchor)
     {
         var item = SelectedItem();
         if (item == null) return;
@@ -277,7 +284,7 @@ public partial class MainWindow
             menu.Items.Add(pin);
         }
 
-        menu.PlacementTarget = ResultsList;
+        menu.PlacementTarget = anchor;
         menu.IsOpen = true;
     }
 
@@ -289,8 +296,11 @@ public partial class MainWindow
     }
 
     private ResultItemViewModel? SelectedItem()
-        => ResultsList.SelectedItem as ResultItemViewModel
-           ?? ResultsList.Items.Cast<ResultItemViewModel>().FirstOrDefault();
+    {
+        var list = ActiveList;
+        return list.SelectedItem as ResultItemViewModel
+               ?? list.Items.Cast<ResultItemViewModel>().FirstOrDefault();
+    }
 
     private void OpenSelected(bool locateInExplorer)
     {

@@ -12,6 +12,8 @@
     <RootNamespace>ShunSeek.App</RootNamespace>
     <AssemblyName>ShunSeek</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 手绘风格的放大镜图标，由 scripts/make-icon.ps1 生成 -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <!-- WFAC010：WinForms 分析器让我们把 DPI 设置从 manifest 移到 API，但这是 WPF 应用，
          PerMonitorV2 就该写在 manifest 里，这条警告不适用 -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>

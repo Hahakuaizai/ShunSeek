@@ -35,6 +35,7 @@ ShunSeek.sln
 ├─ src/ShunSeek.App/             WPF 界面壳
 │  ├─ App.xaml(.cs)              单实例、托盘、热键、崩溃日志
 │  ├─ Views/                     MainWindow（液态玻璃 + 图标网格）
+│  ├─ Assets/app.ico             应用图标（scripts/make-icon.ps1 生成的手绘线稿）
 │  ├─ Controls/                  LiquidPanel（椭圆角/连续曲率的玻璃面板）
 │  ├─ ViewModels/                MainViewModel（结果、首页固定项、状态、异步图标）
 │  ├─ Services/                  IconCache / PinnedStore / HotkeyManager / TrayIconManager
@@ -88,6 +89,21 @@ scripts/run.bat -NoShow         启动但不弹窗（只驻留托盘）
 
 两种档位都会额外扫「软件/快捷方式/安装目录」（读注册表 Uninstall + 开始菜单，不需要管理员）。
 状态栏会写明当前是哪一档、索引了多少条、增量多少条、最后一次更新是什么时候。
+
+## 打包与安装
+
+```bat
+rem 自包含单文件（目标机器不用装 .NET），产物在 publish\win-x64\ShunSeek.exe
+dotnet publish src\ShunSeek.App -c Release -r win-x64 --self-contained true ^
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish\win-x64
+```
+
+已经装好的一份在 `E:\Apps\ShunSeek\ShunSeek.exe`，桌面快捷方式「瞬觅 ShunSeek」指向它。
+
+- 图标是手绘线稿（透明底 + 墨线放大镜），由 `scripts/make-icon.ps1` 生成，
+  256/96/64/48/32/16 六个尺寸各画一遍打进一个 ICO，小尺寸不叠笔画所以不糊。
+- 换图标后 Windows 有图标缓存，必要时刷新：`ie4uinit.exe -show`，或删掉快捷方式重建成。
+- 单文件自包含版约 160MB（WPF 运行时全打包进去），首次启动会解压到临时目录，稍慢几秒。
 
 ## 索引与增量更新（初版的核心机制）
 

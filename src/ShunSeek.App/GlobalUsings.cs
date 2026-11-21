@@ -6,6 +6,7 @@ global using Brush = System.Windows.Media.Brush;
 global using Color = System.Windows.Media.Color;
 global using ColorConverter = System.Windows.Media.ColorConverter;
 global using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+global using ListBox = System.Windows.Controls.ListBox;
 global using Size = System.Windows.Size;
 global using Point = System.Windows.Point;
 global using Clipboard = System.Windows.Clipboard;

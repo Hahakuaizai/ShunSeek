@@ -105,6 +105,28 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- 搜索结果行：一行一条，悬停/选中是极淡的墨色圆角 -->
+        <Style x:Key="ResultRow" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ctl:LiquidPanel x:Name="Bd" Radius="10" Fill="Transparent" StrokeThickness="0">
+                            <ContentPresenter Margin="8,0" />
+                        </ctl:LiquidPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Fill" Value="#0F1D232B" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Fill" Value="#1A1D232B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </ui:FluentWindow.Resources>
 
     <ctl:LiquidPanel Radius="{StaticResource RadiusOuter}"
@@ -240,12 +262,65 @@
                            FontSize="13" Foreground="#661D232B"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
 
-                <!-- ④ 图标网格 -->
+                <!-- ④ 搜索结果：一行一条（图标 + 名称 + 路径 + 类型），一屏能看十几条 -->
                 <ListBox x:Name="ResultsList" Style="{x:Null}"
+                         Grid.Row="2"
+                         Margin="14,6,14,0"
+                         ItemsSource="{Binding Results}"
+                         ItemContainerStyle="{StaticResource ResultRow}"
+                         Visibility="{Binding ResultsVisibility}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         MouseDoubleClick="ResultsList_MouseDoubleClick"
+                         PreviewMouseRightButtonDown="ResultsList_PreviewMouseRightButtonDown">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Height="42" ToolTip="{Binding Path}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="34" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid Grid.Column="0" Width="26" Height="26" VerticalAlignment="Center">
+                                    <Border CornerRadius="7" Background="#141D232B"
+                                            Visibility="{Binding PlaceholderVisibility}" />
+                                    <Image Source="{Binding Icon}" Width="26" Height="26"
+                                           Visibility="{Binding IconVisibility}"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Grid>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,12,0">
+                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#E61D232B"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Path}" FontSize="10.5" Foreground="#8C1D232B"
+                                               TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE840;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                               Foreground="#3B82F6" VerticalAlignment="Center" Margin="0,0,6,0"
+                                               Visibility="{Binding PinVisibility}" />
+                                    <Border CornerRadius="6" Background="#0F1D232B" Padding="8,2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding CategoryLabel}" FontSize="10.5" Foreground="#8C1D232B" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- ⑤ 首页：空查询时显示图标网格（固定 + 最近） -->
+                <ListBox x:Name="HomeGrid" Style="{x:Null}"
                          Grid.Row="2"
                          Margin="18,8,18,0"
                          ItemsSource="{Binding Results}"
                          ItemContainerStyle="{StaticResource TileItem}"
+                         Visibility="{Binding HomeVisibility}"
                          Background="Transparent"
                          BorderThickness="0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -262,10 +337,9 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Width="152" ToolTip="{Binding Path}">
-                                <!-- 图标位：系统原版图标，异步加载；固定项右上角挂一枚别针 -->
                                 <Grid Height="58">
                                     <Border Width="52" Height="52" CornerRadius="13"
-                                            Background="#33FFFFFF"
+                                            Background="#141D232B"
                                             Visibility="{Binding PlaceholderVisibility}"
                                             HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     <Image Source="{Binding Icon}" Width="56" Height="56"
@@ -273,7 +347,7 @@
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     <Border Width="18" Height="18" CornerRadius="9"
-                                            Background="#F2FFFFFF" BorderBrush="#4DFFFFFF" BorderThickness="1"
+                                            Background="#F2FFFFFF" BorderBrush="#331D232B" BorderThickness="1"
                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,10,0"
                                             Visibility="{Binding PinVisibility}">
                                         <TextBlock Text="&#xE840;" FontFamily="{StaticResource IconFont}"
@@ -290,7 +364,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <!-- ⑤ 底栏 -->
+                <!-- ⑥ 底栏 -->
                 <Grid Grid.Row="3" Margin="24,6,20,12">
                     <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="#731D232B"
                                VerticalAlignment="Center" HorizontalAlignment="Left"

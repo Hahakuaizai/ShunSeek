@@ -1,6 +1,5 @@
 using Microsoft.Win32;
 using System.IO;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace ShunSeek.App;
@@ -100,7 +99,8 @@ internal static class StartupRegistration
             return $"\"{exe}\"";
         }
 
-        var dll = Assembly.GetEntryAssembly()?.Location;
-        return string.IsNullOrEmpty(exe) || string.IsNullOrEmpty(dll) ? string.Empty : $"\"{exe}\" \"{dll}\"";
+        // 单文件发布时 Assembly.Location 恒为空串，入口 dll 用基目录拼（只有调试期才走这条分支）
+        var dll = Path.Combine(AppContext.BaseDirectory, "ShunSeek.dll");
+        return string.IsNullOrEmpty(exe) ? string.Empty : $"\"{exe}\" \"{dll}\"";
     }
 }
