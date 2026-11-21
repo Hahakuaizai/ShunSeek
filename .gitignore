@@ -1,0 +1,9 @@
+.alma-snapshots
+
+# .NET 构建产物（源码目录只留代码）
+bin/
+obj/
+
+# 发布产物
+publish/
+*.user

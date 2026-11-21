@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- 托盘图标用 WinForms 的 NotifyIcon，所以同时开 WinForms；
+         代价是 Application 等类型名有二义性，代码里一律写全限定名 -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ShunSeek.App</RootNamespace>
+    <AssemblyName>ShunSeek</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFAC010：WinForms 分析器让我们把 DPI 设置从 manifest 移到 API，但这是 WPF 应用，
+         PerMonitorV2 就该写在 manifest 里，这条警告不适用 -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- 发布单文件（阶段 5 用）：dotnet publish -c Release -r win-x64，self-contained + PublishSingleFile -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF-UI（lepoco/wpfui）：提供 FluentWindow + Mica 背景 + Fluent 控件样式，
+         是这个壳子"像 DeskBox 一样好看"的关键依赖。
+         注意包名是 WPF-UI（带连字符），"Wpf.Ui"/3.0.5 那套是老的 .NET Framework 包，
+         装错会在 XAML 编译期报 MC3074（找不到 FluentWindow/ThemesDictionary）。
+         3.1.1 是 3.x 线最后一个版本，含 net8.0-windows7.0 目标、API 与本文档一致。 -->
+    <PackageReference Include="WPF-UI" Version="3.1.1" />
+    <ProjectReference Include="..\ShunSeek.Core\ShunSeek.Core.csproj" />
+  </ItemGroup>
+
+</Project>

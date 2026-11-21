@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- 引擎层不引用任何 UI，保证可在任意平台（含 Linux）编译与跑基准 -->
+    <RootNamespace>ShunSeek.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- GB2312 编码提供程序：PinyinInitials 的边界字表法需要按 GB2312 编码取汉字的区位码 -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

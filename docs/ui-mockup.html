@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>瞬觅 ShunSeek · UI 目标稿</title>
+<style>
+  /* 这是给开发对着调 XAML 的静态目标稿：尺寸 700x500、深色 Mica、布局结构与 MainWindow.xaml 一一对应。
+     Mica 在浏览器里用 backdrop-filter 近似；真实 WPF 里由 FluentWindow 的 WindowBackdropType="Mica" 提供。 */
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+  body {
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background:
+      radial-gradient(900px 500px at 15% 10%, rgba(37,99,235,.35), transparent 60%),
+      radial-gradient(800px 600px at 85% 90%, rgba(124,58,237,.28), transparent 60%),
+      radial-gradient(600px 400px at 70% 15%, rgba(5,150,105,.20), transparent 60%),
+      linear-gradient(135deg, #10131a, #171a21 55%, #101216);
+    padding: 40px 16px; color: #f2f2f2;
+  }
+  .window {
+    width: 700px; height: 500px; border-radius: 14px; overflow: hidden;
+    background: rgba(32,32,32,.68);
+    backdrop-filter: blur(42px) saturate(1.6); -webkit-backdrop-filter: blur(42px) saturate(1.6);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 24px 70px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.4);
+    display: flex; flex-direction: column;
+  }
+  /* ① 搜索框 */
+  .search { margin: 16px 18px 6px; position: relative; }
+  .search .box {
+    display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 12px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16);
+    border-bottom: 2px solid #4cc2ff; border-radius: 6px;
+  }
+  .search svg { flex: none; opacity: .85; }
+  .search .q { font-size: 16px; color: #fff; letter-spacing: .2px; }
+  .search .q .caret { display: inline-block; width: 1.5px; height: 18px; background: #fff; vertical-align: -3px; margin-left: 1px; animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .esc {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 10px; color: #a8a8a8; background: rgba(255,255,255,.13);
+    padding: 2px 6px; border-radius: 4px; letter-spacing: .5px;
+  }
+  /* ② 分类筛选条 */
+  .chips { display: flex; gap: 6px; margin: 8px 18px 10px; flex-wrap: nowrap; overflow: hidden; }
+  .chip {
+    font-size: 12px; color: #e8e8e8; padding: 4px 11px; border-radius: 12px; white-space: nowrap;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18); cursor: pointer;
+  }
+  .chip:hover { background: rgba(255,255,255,.18); }
+  .chip.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  /* ③ 结果列表 */
+  .results { flex: 1; overflow: hidden; padding: 2px 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; }
+  .row.selected { background: rgba(255,255,255,.10); }
+  .tile {
+    width: 32px; height: 32px; border-radius: 7px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px;
+  }
+  .main { flex: 1; min-width: 0; }
+  .name { font-size: 13.5px; color: #f2f2f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name b { color: #7cc4ff; font-weight: 600; }
+  .path { font-size: 11px; color: #9a9a9a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .tag {
+    flex: none; font-size: 10.5px; color: #cfcfcf; background: rgba(255,255,255,.12);
+    padding: 2px 7px; border-radius: 8px;
+  }
+  /* ④ 状态栏 */
+  .status {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 6px 18px 12px; font-size: 11.5px; color: #9a9a9a;
+  }
+  .status .keys { color: #6e6e6e; }
+  .note { margin-top: 22px; max-width: 700px; font-size: 12.5px; line-height: 1.9; color: rgba(255,255,255,.55); }
+  .note b { color: rgba(255,255,255,.85); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <!-- ① 搜索框：示例输入拼音首字母 wzry -->
+  <div class="search">
+    <div class="box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="#e8e8e8" stroke-width="1.8"/><path d="M15.5 15.5 L21 21" stroke="#e8e8e8" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <div class="q">wzry<span class="caret"></span></div>
+    </div>
+    <div class="esc">ESC</div>
+  </div>
+
+  <!-- ② 分类筛选条 -->
+  <div class="chips">
+    <div class="chip active">全部</div>
+    <div class="chip">应用</div>
+    <div class="chip">快捷方式</div>
+    <div class="chip">安装目录</div>
+    <div class="chip">文件夹</div>
+    <div class="chip">文档</div>
+    <div class="chip">图片</div>
+    <div class="chip">视频</div>
+    <div class="chip">音频</div>
+    <div class="chip">更多</div>
+  </div>
+
+  <!-- ③ 结果列表：拼音首字母命中「王者荣耀」 -->
+  <div class="results">
+    <div class="row selected">
+      <div class="tile" style="background:#7c3aed">捷</div>
+      <div class="main">
+        <div class="name">王者荣耀.lnk</div>
+        <div class="path">C:\Users\demo\Desktop\王者荣耀.lnk</div>
+      </div>
+      <div class="tag">快捷方式</div>
+    </div>
+    <div class="row">
+      <div class="tile" style="background:#2563eb">软</div>
+      <div class="main">
+        <div class="name">王者荣耀</div>
+        <div class="path">D:\Games\王者荣耀\王者荣耀.exe</div>
+      </div>
+      <div class="tag">应用</div>
+    </div>
+    <div class="row">
+      <div class="tile" style="background:#475569">录</div>
+      <div class="main">
+        <div class="name">王者荣耀</div>
+        <div class="path">D:\Games\王者荣耀</div>
+      </div>
+      <div class="tag">安装目录</div>
+    </div>
+    <div class="row">
+      <div class="tile" style="background:#d97706">夹</div>
+      <div class="main">
+        <div class="name">王者荣耀录像</div>
+        <div class="path">D:\视频\王者荣耀录像</div>
+      </div>
+      <div class="tag">文件夹</div>
+    </div>
+    <div class="row">
+      <div class="tile" style="background:#dc2626">视</div>
+      <div class="main">
+        <div class="name">王者荣耀五杀集锦.mp4</div>
+        <div class="path">D:\视频\王者荣耀五杀集锦.mp4</div>
+      </div>
+      <div class="tag">视频</div>
+    </div>
+    <div class="row">
+      <div class="tile" style="background:#059669">图</div>
+      <div class="main">
+        <div class="name">王者荣耀战绩截图.png</div>
+        <div class="path">C:\Users\demo\Pictures\王者荣耀战绩截图.png</div>
+      </div>
+      <div class="tag">图片</div>
+    </div>
+  </div>
+
+  <!-- ④ 状态栏 -->
+  <div class="status">
+    <div>6 条结果 · 9 ms</div>
+    <div class="keys">↑↓ 选择 · Enter 打开 · Ctrl+Enter 打开所在文件夹</div>
+  </div>
+</div>
+
+<div class="note">
+  <b>对照要点（调 XAML 时逐项对）：</b><br>
+  窗口 700×500、圆角 14、深色 Mica（背景能透出桌面壁纸的颜色倾向）；搜索框高 42、字号 16、聚焦时底部主题蓝线；
+  Chip 高约 24、选中填 #2563EB；结果行高约 44、图标位 32×32 圆角 7、名称 13.5 / 路径 11 灰；
+  选中行背景为白色 10% 透明；状态栏 11.5 灰、左侧报「条数 + 耗时」——耗时必须真实（这是产品的招牌）。
+</div>
+
+</body>
+</html>
