@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- GB2312 编码提供程序：PinyinInitials 的边界字表法需要按 GB2312 编码取汉字的区位码 -->
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <!-- 全拼：TinyPinyin 自带压缩音节表，纯内存、无 IO，用于 weixin → 微信 -->
+    <PackageReference Include="TinyPinyin" Version="1.1.0" />
   </ItemGroup>
 
 </Project>

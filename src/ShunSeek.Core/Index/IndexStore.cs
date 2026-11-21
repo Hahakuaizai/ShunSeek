@@ -24,8 +24,11 @@ public sealed class IndexStore
     public int[] NameOffset { get; private init; } = Array.Empty<int>();
     public int[] NameLength { get; private init; } = Array.Empty<int>();
     public char[] InitialsArena { get; private init; } = Array.Empty<char>();
+    public char[] PinyinArena { get; private init; } = Array.Empty<char>();
     public int[] InitialsOffset { get; private init; } = Array.Empty<int>();
     public int[] InitialsLength { get; private init; } = Array.Empty<int>();
+    public int[] PinyinOffset { get; private init; } = Array.Empty<int>();
+    public int[] PinyinLength { get; private init; } = Array.Empty<int>();
     public byte[] Category { get; private init; } = Array.Empty<byte>();
     public int[] ParentRef { get; private init; } = Array.Empty<int>();   // 父条目下标，-1 表示无
     public ulong[] FileRef { get; private init; } = Array.Empty<ulong>(); // NTFS 文件引用号，无则 0
@@ -36,14 +39,15 @@ public sealed class IndexStore
 
     public ReadOnlySpan<char> LowerName(int i) => NameArena.AsSpan(NameOffset[i], NameLength[i]);
     public ReadOnlySpan<char> Initials(int i) => InitialsArena.AsSpan(InitialsOffset[i], InitialsLength[i]);
+    public ReadOnlySpan<char> FullPinyin(int i) => PinyinArena.AsSpan(PinyinOffset[i], PinyinLength[i]);
     public EntryCategory CategoryOf(int i) => (EntryCategory)Category[i];
 
     /// <summary>索引内存粗估（字节），给 Bench 和诊断页用：数组实际占用 + string 估算。</summary>
     public long EstimateMemoryBytes()
     {
         long bytes = 0;
-        bytes += (long)NameArena.Length * 2 + (long)InitialsArena.Length * 2;
-        bytes += (long)Count * (4 + 4 + 4 + 4 + 1 + 4 + 8); // 各并行数组
+        bytes += (long)NameArena.Length * 2 + (long)InitialsArena.Length * 2 + (long)PinyinArena.Length * 2;
+        bytes += (long)Count * (4 + 4 + 4 + 4 + 4 + 4 + 1 + 4 + 8); // 各并行数组
         for (int i = 0; i < Count; i++)
             bytes += 24 + (DisplayName[i].Length + FullPath[i].Length) * 2L + 16; // string 对象头粗估
         return bytes;
@@ -54,7 +58,9 @@ public sealed class IndexStore
     {
         private readonly List<char> _nameArena = new();
         private readonly List<char> _initialsArena = new();
+        private readonly List<char> _pinyinArena = new();
         private readonly List<int> _nameOff = new(), _nameLen = new(), _initOff = new(), _initLen = new();
+        private readonly List<int> _pinyinOff = new(), _pinyinLen = new();
         private readonly List<byte> _cat = new();
         private readonly List<int> _parent = new();
         private readonly List<ulong> _refs = new();
@@ -75,6 +81,12 @@ public sealed class IndexStore
             _initLen.Add(initials.Length);
             _initialsArena.AddRange(initials);
 
+            // 全拼（weixin）：只在名字里有汉字时才真正去查表
+            var pinyin = PinyinFull.Convert(displayName);
+            _pinyinOff.Add(_pinyinArena.Count);
+            _pinyinLen.Add(pinyin.Length);
+            _pinyinArena.AddRange(pinyin);
+
             _cat.Add((byte)category);
             _parent.Add(parentIndex);
             _refs.Add(fileRef);
@@ -91,6 +103,9 @@ public sealed class IndexStore
             InitialsArena = _initialsArena.ToArray(),
             InitialsOffset = _initOff.ToArray(),
             InitialsLength = _initLen.ToArray(),
+            PinyinArena = _pinyinArena.ToArray(),
+            PinyinOffset = _pinyinOff.ToArray(),
+            PinyinLength = _pinyinLen.ToArray(),
             Category = _cat.ToArray(),
             ParentRef = _parent.ToArray(),
             FileRef = _refs.ToArray(),

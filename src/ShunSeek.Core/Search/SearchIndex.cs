@@ -148,10 +148,72 @@ public sealed class SearchIndex
 
         int total = 0;
         foreach (var l in locals) if (l != null) total += l.Count;
+
+        // ③ 全拼通道（weixin → 微信）：只在上面两条通道凑不够时才扫。
+        //    全拼串比名字长两三倍，扫一遍不便宜，常见输入不该为它买单。
+        List<SearchHit>[]? pinyinLocals = null;
+        if (initialsEligible && total < limit)
+        {
+            var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = partitions };
+            pinyinLocals = new List<SearchHit>[partitions];
+            try
+            {
+                Parallel.For(0, partitions, options, p =>
+                {
+                    int start = (int)((long)baseCount * p / partitions);
+                    int end = (int)((long)baseCount * (p + 1) / partitions);
+                    var store = Base;
+                    var qSpan = q.AsSpan();
+                    var local = new List<SearchHit>(16);
+                    for (int i = start; i < end; i++)
+                    {
+                        if (catByte.HasValue && store.Category[i] != catByte.Value) continue;
+                        if (store.PinyinLength[i] == 0) continue;
+
+                        int matchAt = store.FullPinyin(i).IndexOf(qSpan, StringComparison.Ordinal);
+                        if (matchAt < 0) continue;
+                        if (IsBaseDead(i)) continue;
+
+                        // 全拼命中排在"名字命中 / 首字母命中"之后：用户打全拼时意图明确，
+                        // 但结果排序上仍优先给名字直接对上的那些。
+                        float score = (matchAt == 0 ? 68f : 42f) - matchAt * 0.1f + store.CategoryOf(i) switch
+                        {
+                            EntryCategory.App or EntryCategory.Shortcut => 12f,
+                            EntryCategory.InstallDir or EntryCategory.Folder => 4f,
+                            _ => 0f,
+                        };
+                        if (boost != null) score += boost(store.FullPath[i]);
+                        local.Add(new SearchHit(i, score, matchAt, false, true));
+                    }
+                    pinyinLocals[p] = local;
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return Array.Empty<SearchHit>();
+            }
+
+            foreach (var l in pinyinLocals) if (l != null) total += l.Count;
+        }
+
         if (total == 0) return Array.Empty<SearchHit>();
 
         var all = new List<SearchHit>(total);
         foreach (var l in locals) if (l != null) all.AddRange(l);
+
+        // 全拼结果去重（同一条目可能既被名字命中又被全拼命中，名字那条优先）
+        if (pinyinLocals != null)
+        {
+            var seen = new HashSet<int>(all.Count);
+            foreach (var hit in all) seen.Add(hit.Index);
+            foreach (var l in pinyinLocals)
+            {
+                if (l == null) continue;
+                foreach (var hit in l)
+                    if (seen.Add(hit.Index)) all.Add(hit);
+            }
+        }
+
         all.Sort(static (a, b) => b.Score.CompareTo(a.Score));
         if (all.Count > limit) all.RemoveRange(limit, all.Count - limit);
         return all;

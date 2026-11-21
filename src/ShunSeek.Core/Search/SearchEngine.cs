@@ -1,7 +1,8 @@
 namespace ShunSeek.Core;
 
 /// <summary>一条搜索命中。Index 是 SearchIndex 统一口径下的下标，组装显示信息时再去取冷数据。</summary>
-public readonly record struct SearchHit(int Index, float Score, int MatchStart, bool ViaInitials);
+public readonly record struct SearchHit(
+    int Index, float Score, int MatchStart, bool ViaInitials, bool ViaPinyin = false);
 
 /// <summary>
 /// 搜索引擎：对当前索引快照做并行子串扫描。
