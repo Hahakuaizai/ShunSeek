@@ -20,21 +20,18 @@
     <ui:FluentWindow.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-        <!-- 圆角体系（同心圆角：内角 ≈ 外角 − 内缩距离，越往里越小，视觉上才"套"得住）
-             外框  30 / 44  （椭圆角 = 连续曲率）
-             控件  12 / 20  （搜索框、按钮，内缩约 18~20）
-             磁贴  12 / 16  （列表里再缩一层） -->
-        <system:Double x:Key="RadiusOuterX">30</system:Double>
-        <system:Double x:Key="RadiusOuterY">44</system:Double>
-        <system:Double x:Key="RadiusControlX">12</system:Double>
-        <system:Double x:Key="RadiusControlY">20</system:Double>
-        <system:Double x:Key="RadiusTileX">12</system:Double>
-        <system:Double x:Key="RadiusTileY">16</system:Double>
+        <!-- 圆角体系：单一半径 + 超椭圆角（squircle），同心关系 = 内角 − 内缩距离
+             外框 28（内缩 0）
+             控件 14（内缩约 14~18）
+             磁贴 12（再缩一层） -->
+        <system:Double x:Key="RadiusOuter">28</system:Double>
+        <system:Double x:Key="RadiusControl">14</system:Double>
+        <system:Double x:Key="RadiusTile">12</system:Double>
 
         <LinearGradientBrush x:Key="GlassFill" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#7DF7F9FC" Offset="0" />
-            <GradientStop Color="#3DF2F5FA" Offset="0.45" />
-            <GradientStop Color="#73FFFFFF" Offset="1" />
+            <GradientStop Color="#FAFCFDFF" Offset="0" />
+            <GradientStop Color="#F5F3F6FA" Offset="0.55" />
+            <GradientStop Color="#F2E9EEF5" Offset="1" />
         </LinearGradientBrush>
 
         <!-- 边缘高光：左上最亮，中段几乎透明，右下再亮一点——玻璃的厚度感 -->
@@ -46,8 +43,8 @@
         </LinearGradientBrush>
 
         <LinearGradientBrush x:Key="InnerFill" StartPoint="0,0" EndPoint="0.8,1">
-            <GradientStop Color="#CCFFFFFF" Offset="0" />
-            <GradientStop Color="#8CFFFFFF" Offset="1" />
+            <GradientStop Color="#FAFFFFFF" Offset="0" />
+            <GradientStop Color="#E8FFFFFF" Offset="1" />
         </LinearGradientBrush>
 
         <LinearGradientBrush x:Key="SheenBrush" StartPoint="0,0" EndPoint="1,0">
@@ -72,10 +69,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#38FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#0F1D232B" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#59FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1A1D232B" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -90,19 +87,17 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <ctl:LiquidPanel x:Name="Bd"
-                                         RadiusX="{StaticResource RadiusTileX}"
-                                         RadiusY="{StaticResource RadiusTileY}"
+                        <ctl:LiquidPanel x:Name="Bd" Radius="{StaticResource RadiusTile}"
                                          Fill="Transparent" StrokeThickness="0">
                             <ContentPresenter Margin="4,7" />
                         </ctl:LiquidPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#38FFFFFF" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#0F1D232B" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Fill" Value="#59FFFFFF" />
-                                <Setter TargetName="Bd" Property="Stroke" Value="#80FFFFFF" />
+                                <Setter TargetName="Bd" Property="Fill" Value="#1A1D232B" />
+                                <Setter TargetName="Bd" Property="Stroke" Value="#261D232B" />
                                 <Setter TargetName="Bd" Property="StrokeThickness" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -112,34 +107,25 @@
         </Style>
     </ui:FluentWindow.Resources>
 
-    <ctl:LiquidPanel RadiusX="{StaticResource RadiusOuterX}" RadiusY="{StaticResource RadiusOuterY}"
+    <ctl:LiquidPanel Radius="{StaticResource RadiusOuter}"
                      Fill="{StaticResource GlassFill}" Stroke="{StaticResource GlassStroke}">
         <Grid>
             <!-- 面板里的柔光斑：玻璃后面透出来的颜色倾向（参考稿那三团渐变） -->
-            <Ellipse Width="360" Height="300" HorizontalAlignment="Left" VerticalAlignment="Top"
-                     Margin="-80,-90,0,0" IsHitTestVisible="False">
+            <Ellipse Width="620" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top"
+                     Margin="-200,-200,0,0" IsHitTestVisible="False">
                 <Ellipse.Fill>
                     <RadialGradientBrush>
-                        <GradientStop Color="#80638DFF" Offset="0" />
-                        <GradientStop Color="#00638DFF" Offset="1" />
+                        <GradientStop Color="#24819BFF" Offset="0" />
+                        <GradientStop Color="#00819BFF" Offset="1" />
                     </RadialGradientBrush>
                 </Ellipse.Fill>
             </Ellipse>
-            <Ellipse Width="340" Height="300" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                     Margin="0,0,-70,-80" IsHitTestVisible="False">
+            <Ellipse Width="560" Height="460" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-170,-170" IsHitTestVisible="False">
                 <Ellipse.Fill>
                     <RadialGradientBrush>
-                        <GradientStop Color="#73A88BFA" Offset="0" />
-                        <GradientStop Color="#00A88BFA" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-            <Ellipse Width="280" Height="240" HorizontalAlignment="Right" VerticalAlignment="Top"
-                     Margin="0,-60,-40,0" IsHitTestVisible="False">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#6622D3EE" Offset="0" />
-                        <GradientStop Color="#0022D3EE" Offset="1" />
+                        <GradientStop Color="#1C9C8BFF" Offset="0" />
+                        <GradientStop Color="#009C8BFF" Offset="1" />
                     </RadialGradientBrush>
                 </Ellipse.Fill>
             </Ellipse>
@@ -148,8 +134,8 @@
             <Rectangle IsHitTestVisible="False">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#0D1D232B" Offset="0" />
-                        <GradientStop Color="#1A1D232B" Offset="1" />
+                        <GradientStop Color="#051D232B" Offset="0" />
+                        <GradientStop Color="#0A1D232B" Offset="1" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
@@ -170,10 +156,11 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <ctl:LiquidPanel Grid.Column="0" Height="46"
-                                     RadiusX="{StaticResource RadiusControlX}"
-                                     RadiusY="{StaticResource RadiusControlY}"
-                                     Fill="{StaticResource InnerFill}" Stroke="#66FFFFFF">
+                    <ctl:LiquidPanel Grid.Column="0" Height="46" Radius="{StaticResource RadiusControl}"
+                                     Fill="{StaticResource InnerFill}" Stroke="#241D232B">
+                        <ctl:LiquidPanel.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Direction="270" Opacity="0.10" Color="#1D232B" />
+                        </ctl:LiquidPanel.Effect>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -281,7 +268,7 @@
                                             Background="#33FFFFFF"
                                             Visibility="{Binding PlaceholderVisibility}"
                                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <Image Source="{Binding Icon}" Width="54" Height="54"
+                                    <Image Source="{Binding Icon}" Width="56" Height="56"
                                            Visibility="{Binding IconVisibility}"
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -295,7 +282,7 @@
                                     </Border>
                                 </Grid>
                                 <TextBlock Text="{Binding Name}"
-                                           FontSize="12" Foreground="#D91D232B"
+                                           FontSize="12.5" Foreground="#E61D232B"
                                            TextAlignment="Center" TextTrimming="CharacterEllipsis"
                                            Margin="0,7,0,0" />
                             </StackPanel>
@@ -324,7 +311,7 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#38FFFFFF" />
+                                        <Setter TargetName="Bd" Property="Background" Value="#0F1D232B" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -333,8 +320,21 @@
                 </Grid>
             </Grid>
 
+            <!-- 顶部内高光：贴着上边缘的一条白线，玻璃才有厚度 -->
+            <Rectangle Height="1" VerticalAlignment="Top" IsHitTestVisible="False" Margin="34,1,34,0"
+                       RadiusX="1" RadiusY="1">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00FFFFFF" Offset="0" />
+                        <GradientStop Color="#CCFFFFFF" Offset="0.28" />
+                        <GradientStop Color="#CCFFFFFF" Offset="0.72" />
+                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
             <!-- 液态流动高光：一条斜着的白色渐变，8 秒扫一趟（参考稿的 liquid 动画） -->
-            <Rectangle Width="300" IsHitTestVisible="False" Opacity="0.55"
+            <Rectangle Width="300" IsHitTestVisible="False" Opacity="0.3"
                        Fill="{StaticResource SheenBrush}" HorizontalAlignment="Left">
                 <Rectangle.RenderTransform>
                     <TransformGroup>

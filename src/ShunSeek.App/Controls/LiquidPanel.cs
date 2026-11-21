@@ -5,23 +5,28 @@ using System.Windows.Media;
 namespace ShunSeek.App.Controls;
 
 /// <summary>
-/// 液态玻璃面板：连续曲率圆角 + 玻璃填充 + 边缘高光。
+/// 液态玻璃面板：连续曲率圆角（squircle / 超椭圆）+ 玻璃填充 + 边缘高光。
 ///
-/// 为什么不用 Border：WPF 的 CornerRadius 只能画正圆弧（rx == ry），
-/// 而"连续曲率"（squircle / 超椭圆）观感来自**椭圆角**——垂直半径比水平半径大，
-/// 角部过渡更柔和、更饱满。这里自己用 StreamGeometry 拼椭圆形圆角并裁切子元素。
+/// 为什么不用 Border 的 CornerRadius：那是正圆弧，圆弧在切点处曲率突变，看起来"方中带硬"。
+/// 连续曲率的做法是把角做成**超椭圆**：|x|^n + |y|^n = r^n（n≈4），
+/// 曲率从直边的 0 平滑过渡到中点最大，观感才是苹果那种"柔而不软"的角。
+/// 这里按参数方程采样成折线（每角 14 段，1x 下看不出棱），再裁切子元素。
 ///
-/// 填充与描边都做成可绑定的 Brush，方便外面用 LinearGradientBrush 堆玻璃渐变和边缘高光。
+/// 内外圆角：只用**一个** Radius，同心关系就是「内角 = 外角 − 内缩距离」，
+/// 不做椭圆的双半径——那会让角在纵横方向比例不一致，正是上一版看着不对的原因。
 /// </summary>
 public sealed class LiquidPanel : Decorator
 {
-    public static readonly DependencyProperty RadiusXProperty = DependencyProperty.Register(
-        nameof(RadiusX), typeof(double), typeof(LiquidPanel),
-        new FrameworkPropertyMetadata(28.0, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryChanged));
+    private const int CornerSegments = 14; // 每个角的采样段数
 
-    public static readonly DependencyProperty RadiusYProperty = DependencyProperty.Register(
-        nameof(RadiusY), typeof(double), typeof(LiquidPanel),
-        new FrameworkPropertyMetadata(42.0, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryChanged));
+    public static readonly DependencyProperty RadiusProperty = DependencyProperty.Register(
+        nameof(Radius), typeof(double), typeof(LiquidPanel),
+        new FrameworkPropertyMetadata(24.0, FrameworkPropertyMetadataOptions.AffectsRender, OnShapeChanged));
+
+    /// <summary>超椭圆指数：2 = 正圆角，4~5 = 典型 squircle 观感。</summary>
+    public static readonly DependencyProperty ExponentProperty = DependencyProperty.Register(
+        nameof(Exponent), typeof(double), typeof(LiquidPanel),
+        new FrameworkPropertyMetadata(4.0, FrameworkPropertyMetadataOptions.AffectsRender, OnShapeChanged));
 
     public static readonly DependencyProperty FillProperty = DependencyProperty.Register(
         nameof(Fill), typeof(Brush), typeof(LiquidPanel),
@@ -35,18 +40,16 @@ public sealed class LiquidPanel : Decorator
         nameof(StrokeThickness), typeof(double), typeof(LiquidPanel),
         new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    /// <summary>水平方向的圆角半径。</summary>
-    public double RadiusX
+    public double Radius
     {
-        get => (double)GetValue(RadiusXProperty);
-        set => SetValue(RadiusXProperty, value);
+        get => (double)GetValue(RadiusProperty);
+        set => SetValue(RadiusProperty, value);
     }
 
-    /// <summary>垂直方向的圆角半径（比 RadiusX 大，才有连续曲率的饱满感）。</summary>
-    public double RadiusY
+    public double Exponent
     {
-        get => (double)GetValue(RadiusYProperty);
-        set => SetValue(RadiusYProperty, value);
+        get => (double)GetValue(ExponentProperty);
+        set => SetValue(ExponentProperty, value);
     }
 
     public Brush? Fill
@@ -70,8 +73,12 @@ public sealed class LiquidPanel : Decorator
 
     private Geometry? _geometry;
 
-    private static void OnGeometryChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        => ((LiquidPanel)d)._geometry = null;
+    private static void OnShapeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var panel = (LiquidPanel)d;
+        panel._geometry = null;
+        if (panel.Child != null) panel.Child.Clip = panel.BuildGeometry(panel.RenderSize);
+    }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
@@ -101,37 +108,68 @@ public sealed class LiquidPanel : Decorator
         return size;
     }
 
-    /// <summary>椭圆角矩形：四段 ArcTo，Size 的 x/y 半径分开给，就是连续曲率的观感来源。</summary>
-    private Geometry? BuildGeometry(Size size)
-    {
-        if (size.Width <= 0 || size.Height <= 0) return null;
-
-        double rx = Math.Min(RadiusX, size.Width / 2);
-        double ry = Math.Min(RadiusY, size.Height / 2);
-        double w = size.Width;
-        double h = size.Height;
-        var arcSize = new Size(rx, ry);
-
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            ctx.BeginFigure(new Point(rx, 0), isFilled: true, isClosed: true);
-            ctx.LineTo(new Point(w - rx, 0), true, false);
-            ctx.ArcTo(new Point(w, ry), arcSize, 0, false, SweepDirection.Clockwise, true, false);
-            ctx.LineTo(new Point(w, h - ry), true, false);
-            ctx.ArcTo(new Point(w - rx, h), arcSize, 0, false, SweepDirection.Clockwise, true, false);
-            ctx.LineTo(new Point(rx, h), true, false);
-            ctx.ArcTo(new Point(0, h - ry), arcSize, 0, false, SweepDirection.Clockwise, true, false);
-            ctx.LineTo(new Point(0, ry), true, false);
-            ctx.ArcTo(new Point(rx, 0), arcSize, 0, false, SweepDirection.Clockwise, true, false);
-        }
-        geometry.Freeze();
-        return geometry;
-    }
-
     protected override void OnVisualChildrenChanged(DependencyObject? visualAdded, DependencyObject? visualRemoved)
     {
         base.OnVisualChildrenChanged(visualAdded, visualRemoved);
         if (Child != null) Child.Clip = BuildGeometry(RenderSize);
     }
+
+    /// <summary>
+    /// 超椭圆圆角矩形：四条直边 + 四段采样出来的角。
+    /// 参数方程 x = cx + r·cos(t)^(2/n)，y = cy − r·sin(t)^(2/n)，
+    /// t 从 0 到 π/2，正好从切点走到切点；n 越大越"方"，n=4 是常见的 squircle 手感。
+    /// </summary>
+    private Geometry? BuildGeometry(Size size)
+    {
+        if (size.Width <= 0 || size.Height <= 0) return null;
+
+        double w = size.Width;
+        double h = size.Height;
+        double r = Math.Min(Radius, Math.Min(w, h) / 2);
+        double n = Math.Max(2.0, Exponent);
+        double power = 2.0 / n;
+
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            ctx.BeginFigure(new Point(r, 0), isFilled: true, isClosed: true);
+
+            // 顺时针一圈。每个角都从"刚走过的那条边的切点"出发，
+            // t 从 0 走到 π/2 正好抵达下一条边的切点——方向写反会自交，角上就会出现缺口。
+            ctx.LineTo(new Point(w - r, 0), true, false);
+            for (int i = 1; i <= CornerSegments; i++)
+            {
+                double t = Math.PI / 2 * i / CornerSegments;
+                ctx.LineTo(new Point((w - r) + r * Math.Pow(Math.Sin(t), power),
+                                     r - r * Math.Pow(Math.Cos(t), power)), true, false); // 右上
+            }
+
+            ctx.LineTo(new Point(w, h - r), true, false);
+            for (int i = 1; i <= CornerSegments; i++)
+            {
+                double t = Math.PI / 2 * i / CornerSegments;
+                ctx.LineTo(new Point((w - r) + r * Math.Pow(Math.Cos(t), power),
+                                     (h - r) + r * Math.Pow(Math.Sin(t), power)), true, false); // 右下
+            }
+
+            ctx.LineTo(new Point(r, h), true, false);
+            for (int i = 1; i <= CornerSegments; i++)
+            {
+                double t = Math.PI / 2 * i / CornerSegments;
+                ctx.LineTo(new Point(r - r * Math.Pow(Math.Sin(t), power),
+                                     (h - r) + r * Math.Pow(Math.Cos(t), power)), true, false); // 左下
+            }
+
+            ctx.LineTo(new Point(0, r), true, false);
+            for (int i = 1; i <= CornerSegments; i++)
+            {
+                double t = Math.PI / 2 * i / CornerSegments;
+                ctx.LineTo(new Point(r - r * Math.Pow(Math.Cos(t), power),
+                                     r - r * Math.Pow(Math.Sin(t), power)), true, false); // 左上
+            }
+        }
+        geometry.Freeze();
+        return geometry;
+    }
+
 }
