@@ -69,18 +69,20 @@ public partial class App : System.Windows.Application
         viewModel.Attach(_index, pinned);
         _index.StatusChanged += viewModel.ApplyStatus;
 
+        // 热键要挂在窗口句柄上，可窗口是"热键呼出才显示"的——句柄不创建就永远挂不上。
+        // 所以先 EnsureHandle() 把 HWND 预创建出来（不 Show、不上屏），再注册热键。
+        // 注册必须在托盘构造之前完成，托盘菜单/气泡才能显示实际生效的组合。
+        new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+        _hotkey = new HotkeyManager();
+        _hotkey.Attach(window, window.ToggleShow);
+
         _tray = new TrayIconManager(
             onToggle: () => window.ToggleShow(),
             onRefresh: () => _index.Refresh(),
             onRebuild: () => _ = _index.RebuildAsync("手动重建"),
             onRestartElevated: RestartElevated,
-            onExit: () => Shutdown());
-
-        // 热键要挂在窗口句柄上，可窗口是"热键呼出才显示"的——句柄不创建就永远挂不上。
-        // 所以先 EnsureHandle() 把 HWND 预创建出来（不 Show、不上屏），再注册热键。
-        new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
-        _hotkey = new HotkeyManager();
-        _hotkey.Attach(window, window.ToggleShow);
+            onExit: () => Shutdown(),
+            hotkeyLabel: () => _hotkey.HotkeyLabel);
 
         // 第二个实例按下热键/双击托盘时的"叫醒"通道
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
@@ -92,7 +94,7 @@ public partial class App : System.Windows.Application
             executeOnlyOnce: false);
 
         Log($"startup: elevated={Environment.IsPrivilegedProcess} args=[{string.Join(' ', e.Args)}]");
-        Log($"hotkey registered={_hotkey.Registered}");
+        Log($"hotkey registered={_hotkey.Registered} combo={_hotkey.HotkeyLabel}");
 
         // 开发/命令行便利：--show 直接弹窗，--query 关键词 预填并立刻搜一次
         string? initialQuery = null;

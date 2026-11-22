@@ -18,14 +18,17 @@ public sealed class TrayIconManager : IDisposable
     private readonly Action _onRebuild;
     private readonly Action _onRestartElevated;
     private readonly Action _onExit;
+    private readonly Func<string> _hotkeyLabel;
 
-    public TrayIconManager(Action onToggle, Action onRefresh, Action onRebuild, Action onRestartElevated, Action onExit)
+    public TrayIconManager(Action onToggle, Action onRefresh, Action onRebuild,
+        Action onRestartElevated, Action onExit, Func<string>? hotkeyLabel = null)
     {
         _onToggle = onToggle;
         _onRefresh = onRefresh;
         _onRebuild = onRebuild;
         _onRestartElevated = onRestartElevated;
         _onExit = onExit;
+        _hotkeyLabel = hotkeyLabel ?? (() => "Ctrl+Alt+Space");
 
         var appIcon = LoadAppIcon();
         App.Log("tray icon: " + (appIcon == null ? "fallback(系统默认)" : "loaded(" + appIcon.Width + "px)"));
@@ -52,7 +55,7 @@ public sealed class TrayIconManager : IDisposable
     public void ShowMenu()
     {
         var menu = new TrayMenu()
-            .AddItem("", "显示搜索", _onToggle, hint: "Alt+Space")
+            .AddItem("", "显示搜索", _onToggle, hint: _hotkeyLabel())
             .AddSeparator()
             .AddItem("", "立即刷新索引", _onRefresh)
             .AddItem("", "重建索引", _onRebuild)
@@ -81,7 +84,7 @@ public sealed class TrayIconManager : IDisposable
             Directory.CreateDirectory(dir);
             File.WriteAllText(flag, DateTime.Now.ToString("O"));
             _icon.ShowBalloonTip(5000, "瞬觅已在托盘",
-                "Win11 可能把它收进了 ^ 折叠区，拖出来固定一下就好。Alt+Space 呼出搜索。",
+                $"Win11 可能把它收进了 ^ 折叠区，拖出来固定一下就好。{_hotkeyLabel()} 呼出搜索。",
                 ToolTipIcon.None);
         }
         catch
