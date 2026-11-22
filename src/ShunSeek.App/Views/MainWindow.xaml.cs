@@ -108,6 +108,10 @@ public partial class MainWindow
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (DataContext is MainViewModel vm) vm.Query = SearchBox.Text;
+
+        // 结果刷出来时列表可见性才切过去，等布局跑完再把第一行选中，
+        // 否则 Enter 会打开上一轮留下的空选择。
+        Dispatcher.BeginInvoke(() => SelectIndex(0), System.Windows.Threading.DispatcherPriority.Background);
     }
 
     // ───────────────────────────── 顶栏按钮 ─────────────────────────────
@@ -197,18 +201,26 @@ public partial class MainWindow
     private void Window_StateChanged(object? sender, EventArgs e)
     {
         bool maximized = WindowState == WindowState.Maximized;
+
+        // 图标与提示跟着窗口状态走：常态给"最大化"，已居中给"还原"
         if (MaximizeGlyph != null) MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         if (RestoreGlyph != null) RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
+        if (MaximizeButton != null) MaximizeButton.ToolTip = maximized ? "还原" : "最大化";
 
-        // 最大化时把外层圆角收掉（四角不能露底色），页叠也收起来，正文铺满整块屏
-        if (RootPanel != null)
+        // 最大化时把外面的投影边收掉、圆角抹平，正文正好铺满可用区域
+        if (Shell != null)
         {
-            RootPanel.Radius = maximized ? 0 : 18;
-            RootPanel.Margin = maximized ? new Thickness(0) : new Thickness(0, 0, 10, 10);
+            Shell.Radius = maximized ? 0 : 12;
+            Shell.Effect = maximized
+                ? null
+                : new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    BlurRadius = 26, ShadowDepth = 6, Direction = 270,
+                    Opacity = 0.55, Color = Color.FromRgb(0, 0, 0),
+                };
         }
-        if (PageStack != null)
-            PageStack.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
-        RootPanel?.InvalidateVisual();
+        if (RootLayer != null)
+            RootLayer.Margin = maximized ? new Thickness(0) : new Thickness(12);
     }
 
     private void FilterButton_Click(object sender, RoutedEventArgs e)
@@ -302,12 +314,11 @@ public partial class MainWindow
 
     private void UpdatePill_Click(object sender, RoutedEventArgs e) => _ = RunDevUpdateAsync();
 
-    private async void UpdateMenu_Click(object sender, RoutedEventArgs e) => await RunDevUpdateAsync();
+    private void UpdateMenu_Click(object sender, RoutedEventArgs e) => _ = RunDevUpdateAsync();
 
-    /// <summary>
-    /// 一键走完：比对 → 编译到暂存目录 → 交给后台脚本覆盖安装目录 → 拉起新版。
-    /// 覆盖只能等本进程退出后才能做，所以最后一步是退出自己。
-    /// </summary>
+    /// <summary>命令行 --dev-update 的入口，和点小红标是同一条路。</summary>
+    public void StartDevUpdate() => _ = RunDevUpdateAsync();
+
     private async Task RunDevUpdateAsync()
     {
         var vm = ViewModel;

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctl="clr-namespace:ShunSeek.App.Controls"
         Title="瞬觅 · 更新"
-        Width="468" Height="368"
+        Width="480" Height="392"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
         WindowStartupLocation="Manual">
@@ -13,158 +13,161 @@
         <FontFamily x:Key="SansFont">Noto Sans SC, Microsoft YaHei UI</FontFamily>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-        <LinearGradientBrush x:Key="PaperFill" StartPoint="0,0" EndPoint="0.2,1">
-            <GradientStop Color="#FFFFFEFC" Offset="0" />
-            <GradientStop Color="#FFF8FAF7" Offset="0.34" />
-            <GradientStop Color="#FFF2F5F1" Offset="0.72" />
-            <GradientStop Color="#FFE9EEEA" Offset="1" />
-        </LinearGradientBrush>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FFC4573F" />
+        <SolidColorBrush x:Key="AccentText" Color="#FFD97A5F" />
+        <SolidColorBrush x:Key="TextHi" Color="#FFEDE9E1" />
+        <SolidColorBrush x:Key="TextMid" Color="#FF98A3A9" />
+        <SolidColorBrush x:Key="TextLow" Color="#FF69747A" />
+        <SolidColorBrush x:Key="HairLine" Color="#FF1E2529" />
+        <SolidColorBrush x:Key="SurfaceHover" Color="#FF1B2328" />
+        <SolidColorBrush x:Key="EdgeLine" Color="#FF232B30" />
 
-        <LinearGradientBrush x:Key="PaperStroke" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FFC9D5CD" Offset="0" />
-            <GradientStop Color="#FFB8C4BC" Offset="0.55" />
-            <GradientStop Color="#FFA8B4AC" Offset="1" />
-        </LinearGradientBrush>
-
-        <LinearGradientBrush x:Key="SpineFill" StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="#FF0E171A" Offset="0" />
-            <GradientStop Color="#FF1B2A30" Offset="0.35" />
-            <GradientStop Color="#FF273A41" Offset="0.72" />
-            <GradientStop Color="#FF152329" Offset="1" />
-        </LinearGradientBrush>
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border CornerRadius="4" Background="#FF2A3439" Margin="3,2" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <Grid>
-        <ctl:LiquidPanel x:Name="Page" Margin="0,0,10,10" Radius="16"
-                         Fill="{StaticResource PaperFill}"
-                         Stroke="{StaticResource PaperStroke}" StrokeThickness="1">
+    <Grid Margin="0,0,18,18">
+        <ctl:LiquidPanel x:Name="Page" Radius="14" Fill="#FF12181B"
+                         Stroke="#FF2A353B" StrokeThickness="1">
             <ctl:LiquidPanel.Effect>
-                <DropShadowEffect BlurRadius="28" ShadowDepth="7" Direction="270" Opacity="0.22" Color="#26323A" />
+                <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270"
+                                  Opacity="0.55" Color="#FF000000" />
             </ctl:LiquidPanel.Effect>
 
-            <Grid ClipToBounds="True">
-                <Rectangle IsHitTestVisible="False" Width="14" HorizontalAlignment="Left"
-                           Fill="{StaticResource SpineFill}" />
-                <Rectangle IsHitTestVisible="False" Width="1" HorizontalAlignment="Left" Margin="14,0,0,0">
-                    <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="#00B9CAC6" Offset="0" />
-                            <GradientStop Color="#99B9CAC6" Offset="0.5" />
-                            <GradientStop Color="#00B9CAC6" Offset="1" />
-                        </LinearGradientBrush>
-                    </Rectangle.Fill>
-                </Rectangle>
+            <Grid Margin="24,18,22,16" Background="Transparent"
+                  MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <Grid Margin="14,0,0,0" Background="Transparent" MouseLeftButtonDown="Header_MouseLeftButtonDown">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <!-- 书眉：一个朱色小标 + 标题，右边只留关闭 -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                    <!-- 书眉 -->
-                    <Grid Grid.Row="0" Margin="18,14,12,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="8"
+                            Background="#26C4573F" BorderBrush="#59C4573F" BorderThickness="1"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE895;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                                   Foreground="{StaticResource AccentText}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
 
-                        <Border Width="22" Height="22" CornerRadius="5" Background="#FFA5382A"
-                                BorderBrush="#FF86291F" BorderThickness="1" VerticalAlignment="Center">
-                            <TextBlock Text="更" FontFamily="{StaticResource SerifFont}" FontSize="11.5"
-                                       Foreground="#FFF6F7F2"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-
-                        <TextBlock Grid.Column="1" Text="瞬觅 · 已更新" FontFamily="{StaticResource SerifFont}"
-                                   FontSize="13" Foreground="#FF1F2622" VerticalAlignment="Center" Margin="9,0,0,0" />
-
-                        <Button Grid.Column="2" Width="30" Height="28" Cursor="Hand"
-                                Click="Close_Click" Foreground="#9A5C6B62">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Bd" CornerRadius="9" Background="Transparent">
-                                        <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="12"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Bd" Property="Background" Value="#14808F8A" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
-
-                    <!-- 副题：时间 + 装到哪里 -->
-                    <StackPanel Grid.Row="1" Margin="18,7,18,0">
-                        <TextBlock x:Name="Subtitle" FontFamily="{StaticResource SansFont}" FontSize="10.5"
-                                   Foreground="#8C5E6B63" TextTrimming="CharacterEllipsis" />
-                        <Rectangle Height="1" Margin="0,9,0,0">
-                            <Rectangle.Fill>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#00A8B8B0" Offset="0" />
-                                    <GradientStop Color="#59A8B8B0" Offset="0.4" />
-                                    <GradientStop Color="#59A8B8B0" Offset="1" />
-                                </LinearGradientBrush>
-                            </Rectangle.Fill>
-                        </Rectangle>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="11,0,0,0">
+                        <TextBlock Text="已更新到最新版本" FontFamily="{StaticResource SerifFont}"
+                                   FontSize="15" Foreground="{StaticResource TextHi}" />
+                        <TextBlock Text="以下改动已在安装目录生效" FontFamily="{StaticResource SansFont}"
+                                   FontSize="10" Foreground="{StaticResource TextLow}" Margin="0,3,0,0" />
                     </StackPanel>
 
-                    <!-- 更新条目 -->
-                    <ScrollViewer Grid.Row="2" Margin="18,8,14,0" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                            <TextBlock x:Name="FallbackText" FontFamily="{StaticResource SerifFont}" FontSize="11.5"
-                                       Foreground="#8C5E6B63" TextWrapping="Wrap" Margin="0,2,0,6" />
+                    <Button Grid.Column="2" Width="30" Height="28" Cursor="Hand"
+                            Click="Close_Click" Foreground="{StaticResource TextMid}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" CornerRadius="8" Background="Transparent">
+                                    <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceHover}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
 
-                            <ItemsControl x:Name="ItemsHost">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,3,0,3">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="14" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Rectangle Width="4" Height="4" Fill="#7CA5352A" VerticalAlignment="Top"
-                                                       Margin="2,6,0,0" RenderTransformOrigin="0.5,0.5">
-                                                <Rectangle.RenderTransform>
-                                                    <RotateTransform Angle="45" />
-                                                </Rectangle.RenderTransform>
-                                            </Rectangle>
-                                            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource SerifFont}"
-                                                       FontSize="11.5" Foreground="#FF2E3730" TextWrapping="Wrap" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
+                <!-- 副题：时间 + 装到哪里，下面一道发丝线 -->
+                <StackPanel Grid.Row="1" Margin="0,13,0,0">
+                    <TextBlock x:Name="Subtitle" FontFamily="{StaticResource SansFont}" FontSize="10"
+                               Foreground="{StaticResource TextLow}" TextTrimming="CharacterEllipsis" />
+                    <Rectangle Height="1" Margin="0,11,0,0" Fill="{StaticResource HairLine}" />
+                </StackPanel>
 
-                    <!-- 页脚 -->
-                    <Grid Grid.Row="3" Margin="18,6,14,12">
-                        <TextBlock Text="按 Esc 关闭" FontFamily="{StaticResource SansFont}" FontSize="10"
-                                   Foreground="#8C8C9990" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                <!-- 更新条目 -->
+                <ScrollViewer Grid.Row="2" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <TextBlock x:Name="FallbackText" FontFamily="{StaticResource SerifFont}" FontSize="12.5"
+                                   Foreground="{StaticResource TextMid}" TextWrapping="Wrap" Margin="0,4,0,4" />
 
-                        <Button HorizontalAlignment="Right" Cursor="Hand" Click="Close_Click"
-                                Foreground="#FF1F2622">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Bd" CornerRadius="9" Background="#14808F8A" Padding="16,6">
-                                        <TextBlock Text="知道了" FontFamily="{StaticResource SerifFont}" FontSize="11.5" />
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Bd" Property="Background" Value="#22808F8A" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
+                        <ItemsControl x:Name="ItemsHost">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,6,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="4" Height="4" Fill="{StaticResource AccentBrush}"
+                                                 VerticalAlignment="Top" Margin="0,7,11,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding}"
+                                                   FontFamily="{StaticResource SerifFont}"
+                                                   FontSize="12.5" Foreground="{StaticResource TextHi}"
+                                                   TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 页脚 -->
+                <Grid Grid.Row="3" Margin="0,14,0,0">
+                    <TextBlock Text="按 Esc 关闭" FontFamily="{StaticResource SansFont}" FontSize="10"
+                               Foreground="{StaticResource TextLow}"
+                               VerticalAlignment="Center" HorizontalAlignment="Left" />
+
+                    <Button HorizontalAlignment="Right" Cursor="Hand" Click="Close_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" CornerRadius="8" Background="#26C4573F"
+                                        BorderBrush="#66C4573F" BorderThickness="1" Padding="16,7">
+                                    <TextBlock Text="知道了" FontFamily="{StaticResource SansFont}" FontSize="11"
+                                               Foreground="{StaticResource TextHi}" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#3AC4573F" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </Grid>
             </Grid>
         </ctl:LiquidPanel>

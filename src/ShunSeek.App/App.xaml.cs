@@ -113,6 +113,10 @@ public partial class App : System.Windows.Application
             });
         }
 
+        // 开发用：--dev-update 走一遍"编译→替换→重启"，省得每次都点页脚的小红标
+        if (e.Args.Contains("--dev-update", StringComparer.OrdinalIgnoreCase))
+            Dispatcher.BeginInvoke(() => window.StartDevUpdate());
+
         // 开发/截图用：--shot <png> 把界面渲染成图片后退出。
         // 窗口放在屏幕外且不抢焦点，用户看不到——改样式时用它验证。
         int shotIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase));
