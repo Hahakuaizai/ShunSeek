@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using ShunSeek.App.Services;
 using ShunSeek.Core;
 
 namespace ShunSeek.App;
@@ -116,7 +117,8 @@ public partial class MainWindow
     /// <summary>把窗口内容渲染成 PNG（离屏验证样式用，不依赖屏幕合成）。</summary>
     public void CaptureToPng(string path)
     {
-        var root = RootPanel;
+        // 整层都截：书页叠在 RootPanel 外面，只截面板会缺右下那圈厚度
+        var root = RootLayer;
         root.UpdateLayout();
 
         int width = (int)Math.Ceiling(root.ActualWidth);
@@ -198,8 +200,14 @@ public partial class MainWindow
         if (MaximizeGlyph != null) MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         if (RestoreGlyph != null) RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
 
-        // 最大化时把外层圆角收掉，否则屏幕四角会露出底色
-        if (RootPanel != null) RootPanel.Radius = maximized ? 0 : 28;
+        // 最大化时把外层圆角收掉（四角不能露底色），页叠也收起来，正文铺满整块屏
+        if (RootPanel != null)
+        {
+            RootPanel.Radius = maximized ? 0 : 18;
+            RootPanel.Margin = maximized ? new Thickness(0) : new Thickness(0, 0, 10, 10);
+        }
+        if (PageStack != null)
+            PageStack.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         RootPanel?.InvalidateVisual();
     }
 
@@ -255,12 +263,105 @@ public partial class MainWindow
         menu.Items.Add(elevated);
 
         menu.Items.Add(new Separator());
+
+        var update = new MenuItem { Header = "检查开发目录改动并更新（重启生效）" };
+        update.Click += UpdateMenu_Click;
+        menu.Items.Add(update);
+
+        var devRoot = new MenuItem { Header = "更改开发目录…" };
+        devRoot.Click += (_, _) => PickDevRoot();
+        menu.Items.Add(devRoot);
+
+        menu.Items.Add(new Separator());
         var exit = new MenuItem { Header = "退出" };
         exit.Click += (_, _) => System.Windows.Application.Current?.Shutdown();
         menu.Items.Add(exit);
 
         menu.PlacementTarget = SettingsButton;
         menu.IsOpen = true;
+    }
+
+    // ───────────────────────────── 开发目录更新 ─────────────────────────────
+
+    /// <summary>启动后查一次开发目录有没有比安装目录新的改动，有就亮出页脚的小红标。</summary>
+    public void RefreshUpdateHint()
+    {
+        try
+        {
+            var check = DevUpdater.Check();
+            UpdatePill.Visibility = check.HasUpdate ? Visibility.Visible : Visibility.Collapsed;
+            UpdatePill.ToolTip = check.HasUpdate
+                ? $"{check.NewerFiles} 个文件比安装目录新 · 点击编译并重启"
+                : null;
+        }
+        catch (Exception ex)
+        {
+            DevUpdater.Log("检查更新失败：" + ex.Message);
+        }
+    }
+
+    private void UpdatePill_Click(object sender, RoutedEventArgs e) => _ = RunDevUpdateAsync();
+
+    private async void UpdateMenu_Click(object sender, RoutedEventArgs e) => await RunDevUpdateAsync();
+
+    /// <summary>
+    /// 一键走完：比对 → 编译到暂存目录 → 交给后台脚本覆盖安装目录 → 拉起新版。
+    /// 覆盖只能等本进程退出后才能做，所以最后一步是退出自己。
+    /// </summary>
+    private async Task RunDevUpdateAsync()
+    {
+        var vm = ViewModel;
+        var check = DevUpdater.Check();
+
+        if (!check.CanCompare)
+        {
+            vm.Notify(check.Problem ?? "无法判断是否有更新");
+            return;
+        }
+
+        if (!check.HasUpdate)
+        {
+            UpdatePill.Visibility = Visibility.Collapsed;
+            vm.Notify("安装目录已经是最新的，没有需要应用的改动");
+            return;
+        }
+
+        UpdatePill.Visibility = Visibility.Collapsed;
+        vm.Notify($"发现 {check.NewerFiles} 个文件有改动，正在编译…");
+
+        var error = await DevUpdater.PublishAsync(DevUpdater.Log);
+        if (error != null)
+        {
+            DevUpdater.Log(error);
+            vm.Notify(error);
+            return;
+        }
+
+        vm.Notify("编译完成，正在替换文件并重启…");
+        if (!DevUpdater.LaunchUpdaterAndRestart(DevUpdater.Log))
+        {
+            vm.Notify("无法启动更新脚本（需要 PowerShell 7 的 pwsh）");
+            return;
+        }
+
+        await Task.Delay(500);
+        System.Windows.Application.Current?.Shutdown();
+    }
+
+    private void PickDevRoot()
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "选择 ShunSeek 的开发目录（含 ShunSeek.sln 的文件夹）",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = false,
+            SelectedPath = DevUpdater.DevRoot,
+        };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        DevUpdater.SaveDevRoot(dialog.SelectedPath);
+        RefreshUpdateHint();
+        ViewModel.Notify("开发目录已改为 " + dialog.SelectedPath);
     }
 
     // ───────────────────────────── 键盘 ─────────────────────────────

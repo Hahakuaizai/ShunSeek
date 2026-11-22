@@ -3,6 +3,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using ShunSeek.App.Services;
+using ShunSeek.App.Views;
 using ShunSeek.Core;
 
 namespace ShunSeek.App;
@@ -160,6 +161,27 @@ public partial class App : System.Windows.Application
 
         // 索引在后台建：几秒后状态栏会变成"就绪"，期间窗口已经能呼出（空结果 + 进度提示）
         _ = _index.StartAsync();
+
+        // 更新过的进程会留一份待展示的更新说明：先弹说明，再顺手查一眼开发目录是否有更新的改动
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var pending = DevUpdater.TakePendingUpdate();
+            if (pending != null)
+            {
+                window.ShowWindow();
+                var updateWindow = new UpdateWindow(pending);
+                updateWindow.Show();
+                updateWindow.Activate();
+            }
+
+            var hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+            hintTimer.Tick += (_, _) =>
+            {
+                hintTimer.Stop();
+                window.RefreshUpdateHint();
+            };
+            hintTimer.Start();
+        }), DispatcherPriority.ApplicationIdle);
     }
 
     protected override void OnExit(ExitEventArgs e)
