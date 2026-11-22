@@ -1,4 +1,4 @@
-# 瞬觅 ShunSeek
+# ShunSeek
 
 不依赖 Everything 的 Windows 全盘搜索工具：热键呼出一个 DeskBox 式的小悬浮窗
 （Fluent/Mica、700×500），文件、文件夹、快捷方式、已安装软件、软件安装目录、
