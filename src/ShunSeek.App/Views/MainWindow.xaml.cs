@@ -5,27 +5,44 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using ShunSeek.App.Services;
 using ShunSeek.Core;
 
 namespace ShunSeek.App;
 
 /// <summary>
-/// 搜索弹窗：热键呼出 → 鼠标所在屏上方居中弹出 → 失焦自动隐藏，DeskBox/Listary 一类启动器的标准行为。
-/// 内容是"图标网格"（对齐 Win11 开始菜单的观感），键盘 ↑↓←→ 在格子里走，Enter 打开。
+/// 搜索窗：热键呼出 → 鼠标所在屏上方居中弹出。普通窗口层级（不置顶），可被其它软件覆盖。
+/// 空查询是首页磁贴，有关键词是详细列表；键盘 ↑↓ 走条目，Enter 打开，Ctrl+Enter 定位。
+/// 显隐、悬停、选中、筛选展开、主题切换全部带短过渡，不做"啪"式跳变。
 /// </summary>
 public partial class MainWindow
 {
-    /// <summary>网格列数（ItemWidth 152 + 边距，700 宽正好 4 列）。键盘上下移动按这个数跳。</summary>
+    /// <summary>首页网格的键盘列数（磁贴 170+12 宽，780 窗约 4 列）。</summary>
     private const int Columns = 4;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    private long _shownAtTicks;
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    private const int WM_NCLBUTTONDOWN = 0xA1;
+    private const int HTCAPTION = 2;
+
     private MainViewModel ViewModel => (MainViewModel)DataContext;
 
-    /// <summary>键盘/右键都作用于"当前可见"的那个列表：搜索时是详细列表，空查询时是首页网格。</summary>
+    private bool _hiding;
+    private bool _closed;
+    private readonly TranslateTransform _rootShift = new();
+    private DropShadowEffect? _shellShadow;
+    private readonly List<FilterOption> _filterOptions = new();
+
+    /// <summary>键盘/右键都作用于"当前可见"的那个列表。</summary>
     private ListBox ActiveList =>
         ViewModel.ResultsVisibility == Visibility.Visible ? ResultsList : HomeGrid;
 
@@ -33,53 +50,212 @@ public partial class MainWindow
     {
         InitializeComponent();
         PreviewKeyDown += OnPreviewKeyDown;
-        ViewModel_ResultsChanged();
+
+        _shellShadow = Shell.Effect as DropShadowEffect;
+        RootLayer.RenderTransform = _rootShift;
+
+        _filterOptions.AddRange(new[]
+        {
+            new FilterOption("", "全部"),
+            new FilterOption("App", "应用"),
+            new FilterOption("Shortcut", "快捷方式"),
+            new FilterOption("InstallDir", "安装目录"),
+            new FilterOption("Folder", "文件夹"),
+            new FilterOption("Document", "文档"),
+            new FilterOption("Image", "图片"),
+            new FilterOption("Video", "视频"),
+            new FilterOption("Audio", "音频"),
+            new FilterOption("Archive", "压缩包"),
+            new FilterOption("Code", "代码"),
+            new FilterOption("Executable", "程序"),
+            new FilterOption("Other", "其他"),
+        });
+        FilterOptions.ItemsSource = _filterOptions;
+
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is not MainViewModel vm) return;
+            vm.Results.CollectionChanged += (_, e) =>
+            {
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                    ActiveList.BeginAnimation(OpacityProperty,
+                        new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(140)));
+                Dispatcher.BeginInvoke(() => SelectIndex(0),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            };
+            RefreshFilterUi();
+        };
+
+        ThemeManager.Changed += () => Dispatcher.BeginInvoke(() =>
+        {
+            RefreshThemeUi();
+            // 资源整批换掉时做一次极短的淡入：像重新蘸了一次墨，而不是"啪"地换皮
+            if (IsVisible)
+            {
+                RootLayer.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(0.72, 1, TimeSpan.FromMilliseconds(170))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                    });
+            }
+        });
+        RefreshThemeUi();
+        RefreshFilterUi();
     }
 
-    private void ViewModel_ResultsChanged()
+    // ───────────────────────────── 主题 ─────────────────────────────
+
+    private void RefreshThemeUi()
     {
-        if (DataContext is MainViewModel vm) vm.Results.CollectionChanged += (_, _) => SelectIndex(0);
+        ThemeGlyph.Text = ThemeManager.IsDark ? "\uE706" : "\uE708";
+        ThemeButton.ToolTip = ThemeManager.IsDark ? "切换为浅色主题" : "切换为深色主题";
+
+        // 投影是 Freezable，绑在上面的 DynamicResource 不一定跟着换；
+        // 直接按当前主题重建一份，浅色下才不会顶着一圈深色重影。
+        if (Shell != null && WindowState != WindowState.Maximized)
+        {
+            var color = System.Windows.Application.Current.TryFindResource("ShadowColor") is Color c
+                ? c : Colors.Black;
+            var opacity = System.Windows.Application.Current.TryFindResource("ShadowOpacity") is double o
+                ? o : 0.55;
+            _shellShadow = new DropShadowEffect
+            {
+                BlurRadius = 26,
+                ShadowDepth = 6,
+                Direction = 270,
+                Color = color,
+                Opacity = opacity,
+            };
+            Shell.Effect = _shellShadow;
+        }
     }
 
-    /// <summary>
-    /// 失焦收起。但刚 Show 出来的那一瞬间，Activate 还没生效就会收到 Deactivated
-    /// （尤其是从后台进程/热键调出来的），这一下必须忽略，否则窗口闪一下又没了。
-    /// </summary>
-    private void OnDeactivated(object? sender, EventArgs e)
+    private void ThemeButton_Click(object sender, RoutedEventArgs e) => ThemeManager.Toggle();
+
+    // ───────────────────────────── 筛选面板 ─────────────────────────────
+
+    private void FilterButton_Click(object sender, RoutedEventArgs e)
     {
-        if (Environment.TickCount64 - _shownAtTicks < 800) return;
-        Hide();
+        RefreshFilterUi();
+        FilterRoot.Opacity = 0;
+        FilterScale.ScaleX = 0.96;
+        FilterScale.ScaleY = 0.96;
+        FilterPopup.IsOpen = true;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        FilterRoot.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)));
+        FilterScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(0.96, 1, TimeSpan.FromMilliseconds(170)) { EasingFunction = ease });
+        FilterScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(0.96, 1, TimeSpan.FromMilliseconds(170)) { EasingFunction = ease });
     }
+
+    private void FilterChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { Tag: string tag }) return;
+        ViewModel.SetCategory(ParseTag(tag));
+        RefreshFilterUi();
+        FilterPopup.IsOpen = false;
+        SearchBox.Focus();
+    }
+
+    private void FilterReset_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SetCategory(null);
+        RefreshFilterUi();
+        FilterPopup.IsOpen = false;
+        SearchBox.Focus();
+    }
+
+    private void RefreshFilterUi()
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var current = vm.Category;
+        foreach (var opt in _filterOptions)
+            opt.IsChecked = ParseTag(opt.Tag) == current;
+        var label = current == null ? "全部类型" : EntryCategoryNames.DisplayName(current.Value);
+        FilterDot.Visibility = current == null ? Visibility.Collapsed : Visibility.Visible;
+        FilterReset.Visibility = current == null ? Visibility.Collapsed : Visibility.Visible;
+        FilterSummary.Text = "当前：" + label;
+        FilterButton.ToolTip = "按类型筛选（" + label + "）";
+    }
+
+    private static EntryCategory? ParseTag(string? tag) => tag switch
+    {
+        "App" => EntryCategory.App,
+        "Shortcut" => EntryCategory.Shortcut,
+        "InstallDir" => EntryCategory.InstallDir,
+        "Folder" => EntryCategory.Folder,
+        "Document" => EntryCategory.Document,
+        "Image" => EntryCategory.Image,
+        "Video" => EntryCategory.Video,
+        "Audio" => EntryCategory.Audio,
+        "Archive" => EntryCategory.Archive,
+        "Code" => EntryCategory.Code,
+        "Executable" => EntryCategory.Executable,
+        "Other" => EntryCategory.Other,
+        _ => null,
+    };
+
+    // ───────────────────────────── 显隐 ─────────────────────────────
 
     /// <summary>热键/托盘共用的显隐切换。</summary>
     public void ToggleShow()
     {
-        if (IsVisible)
-        {
-            Hide();
-            return;
-        }
-
+        if (_closed) return;
+        if (IsVisible) { HideAnimated(); return; }
         ShowWindow();
     }
 
     /// <summary>把窗口叫出来（已在屏上也照样置前，不隐藏）。</summary>
     public void ShowWindow()
     {
+        // 退出流程里可能还有排队的事件回到这里（比如第二个实例的唤醒信号），
+        // 窗口已关就不能再 Show，否则抛 InvalidOperationException。
+        if (_closed) return;
+        _hiding = false;
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
         PositionWindow();
+
+        // 先落到透明+微沉，再淡入上浮，避免"啪"地拍在屏幕上
+        RootLayer.Opacity = 0;
+        _rootShift.Y = 10;
         Show();
-        _shownAtTicks = Environment.TickCount64;
         Activate();
 
-        // 热键是从别的进程抢焦点，Activate() 经常不生效，再硬顶一次前台
         var handle = new WindowInteropHelper(this).Handle;
         if (handle != IntPtr.Zero) SetForegroundWindow(handle);
 
         SearchBox.Focus();
         SearchBox.SelectAll();
         SelectIndex(0);
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        RootLayer.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
+        _rootShift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(220)) { EasingFunction = ease });
+    }
+
+    /// <summary>淡出+微沉后再真正 Hide，收起不突兀。</summary>
+    private void HideAnimated()
+    {
+        if (_hiding) return;
+        _hiding = true;
+        var fade = new DoubleAnimation(RootLayer.Opacity, 0, TimeSpan.FromMilliseconds(110));
+        fade.Completed += (_, _) =>
+        {
+            _hiding = false;
+            Hide();
+            RootLayer.BeginAnimation(OpacityProperty, null);
+            RootLayer.Opacity = 1;
+            _rootShift.BeginAnimation(TranslateTransform.YProperty, null);
+            _rootShift.Y = 0;
+        };
+        RootLayer.BeginAnimation(OpacityProperty, fade);
+        _rootShift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(_rootShift.Y, 6, TimeSpan.FromMilliseconds(110)));
     }
 
     /// <summary>在"鼠标所在的那块屏"的上方居中（多显示器 + 不同缩放都按该屏 DPI 换算）。</summary>
@@ -105,23 +281,40 @@ public partial class MainWindow
         SearchBox.CaretIndex = text.Length;
     }
 
+    /// <summary>调试用：把筛选面板展开（--open-filter），配合离屏截图验证。</summary>
+    public void OpenFilterForShot() => FilterButton_Click(this, new RoutedEventArgs());
+
+    /// <summary>把筛选面板单独渲染成 PNG（Popup 在自己的窗口里，主窗口截图抓不到它）。</summary>
+    public void CaptureFilterToPng(string path)
+    {
+        FilterRoot.UpdateLayout();
+        int width = (int)Math.Ceiling(FilterRoot.ActualWidth);
+        int height = (int)Math.Ceiling(FilterRoot.ActualHeight);
+        if (width <= 0 || height <= 0) throw new InvalidOperationException("筛选面板还没完成布局");
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(FilterRoot);
+
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
+    }
+
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (DataContext is MainViewModel vm) vm.Query = SearchBox.Text;
-
-        // 结果刷出来时列表可见性才切过去，等布局跑完再把第一行选中，
-        // 否则 Enter 会打开上一轮留下的空选择。
         Dispatcher.BeginInvoke(() => SelectIndex(0), System.Windows.Threading.DispatcherPriority.Background);
     }
 
     // ───────────────────────────── 顶栏按钮 ─────────────────────────────
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => HideAnimated();
 
     /// <summary>把窗口内容渲染成 PNG（离屏验证样式用，不依赖屏幕合成）。</summary>
     public void CaptureToPng(string path)
     {
-        // 整层都截：书页叠在 RootPanel 外面，只截面板会缺右下那圈厚度
         var root = RootLayer;
         root.UpdateLayout();
 
@@ -139,28 +332,24 @@ public partial class MainWindow
         encoder.Save(stream);
     }
 
-
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        GlobalClickWatcher.Detach();
+        base.OnClosed(e);
+    }
 
     private void MaximizeButton_Click(object sender, RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool ReleaseCapture();
-
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 2;
-
     /// <summary>
     /// 拖动窗口：整块面板的空白处都能拖（输入框、按钮、列表里不拖）。
-    /// 用 WM_NCLBUTTONDOWN + HTCAPTION 让系统自己接管拖拽，比 DragMove() 稳——
-    /// 无标题栏 + WindowChrome 的组合下 DragMove 经常直接不生效。
+    /// 用 WM_NCLBUTTONDOWN + HTCAPTION 让系统自己接管拖拽，比 DragMove() 稳。
     /// 双击空白处 = 最大化/还原。
     /// </summary>
-    private void Root_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void Root_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source) return;
         if (IsInteractive(source) || IsInsideList(source)) return;
@@ -177,17 +366,13 @@ public partial class MainWindow
         SendMessage(handle, WM_NCLBUTTONDOWN, HTCAPTION, IntPtr.Zero);
     }
 
-    /// <summary>点在结果列表/滚动条上时不要拖动窗口，否则选不中条目。</summary>
     private static bool IsInsideList(DependencyObject source)
     {
         for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
-        {
             if (node is ListBox or System.Windows.Controls.Primitives.ScrollBar) return true;
-        }
         return false;
     }
 
-    /// <summary>点在输入框/按钮上时不要触发窗口拖动。</summary>
     private static bool IsInteractive(DependencyObject source)
     {
         for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
@@ -202,7 +387,6 @@ public partial class MainWindow
     {
         bool maximized = WindowState == WindowState.Maximized;
 
-        // 图标与提示跟着窗口状态走：常态给"最大化"，已居中给"还原"
         if (MaximizeGlyph != null) MaximizeGlyph.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         if (RestoreGlyph != null) RestoreGlyph.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
         if (MaximizeButton != null) MaximizeButton.ToolTip = maximized ? "还原" : "最大化";
@@ -211,56 +395,21 @@ public partial class MainWindow
         if (Shell != null)
         {
             Shell.Radius = maximized ? 0 : 12;
-            Shell.Effect = maximized
-                ? null
-                : new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    BlurRadius = 26, ShadowDepth = 6, Direction = 270,
-                    Opacity = 0.55, Color = Color.FromRgb(0, 0, 0),
-                };
+            Shell.Effect = maximized ? null : _shellShadow;
         }
         if (RootLayer != null)
             RootLayer.Margin = maximized ? new Thickness(0) : new Thickness(12);
-    }
-
-    private void FilterButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (FilterButton.ContextMenu is { } menu)
-        {
-            menu.PlacementTarget = FilterButton;
-            menu.IsOpen = true;
-        }
-    }
-
-    private void FilterMenu_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem clicked || clicked.Tag is not string tag) return;
-        if (DataContext is not MainViewModel vm) return;
-
-        // 菜单是多级的（应用程序/文件 下面还有子项），勾选状态要整棵树一起清
-        foreach (var item in AllMenuItems(FilterButton.ContextMenu.Items))
-            item.IsChecked = ReferenceEquals(item, clicked);
-
-        var category = string.IsNullOrEmpty(tag) ? (EntryCategory?)null : Enum.Parse<EntryCategory>(tag);
-        vm.SetCategory(category);
-        FilterButton.ToolTip = category == null ? "按类型筛选" : $"按类型筛选：{EntryCategoryNames.DisplayName(category.Value)}";
-        SearchBox.Focus();
-    }
-
-    private static IEnumerable<MenuItem> AllMenuItems(ItemCollection items)
-    {
-        foreach (var entry in items)
-        {
-            if (entry is not MenuItem item) continue;
-            yield return item;
-            foreach (var child in AllMenuItems(item.Items)) yield return child;
-        }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         var vm = DataContext as MainViewModel;
         var menu = new ContextMenu();
+
+        var theme = new MenuItem { Header = ThemeManager.IsDark ? "切换为浅色主题" : "切换为深色主题" };
+        theme.Click += (_, _) => ThemeManager.Toggle();
+        menu.Items.Add(theme);
+        menu.Items.Add(new Separator());
 
         var refresh = new MenuItem { Header = "立即刷新索引" };
         refresh.Click += (_, _) => vm?.Service?.Refresh();
@@ -301,10 +450,14 @@ public partial class MainWindow
         try
         {
             var check = DevUpdater.Check();
+            bool wasVisible = UpdatePill.Visibility == Visibility.Visible;
             UpdatePill.Visibility = check.HasUpdate ? Visibility.Visible : Visibility.Collapsed;
             UpdatePill.ToolTip = check.HasUpdate
                 ? $"{check.NewerFiles} 个文件比安装目录新 · 点击编译并重启"
                 : null;
+            if (!wasVisible && UpdatePill.Visibility == Visibility.Visible)
+                UpdatePill.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220)));
         }
         catch (Exception ex)
         {
@@ -377,54 +530,38 @@ public partial class MainWindow
 
     // ───────────────────────────── 键盘 ─────────────────────────────
 
-    private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        int step = ActiveList == HomeGrid ? Columns : 1;
         switch (e.Key)
         {
             case Key.Escape:
-                Hide();
+                if (FilterPopup.IsOpen) { FilterPopup.IsOpen = false; e.Handled = true; break; }
+                if (!string.IsNullOrEmpty(SearchBox.Text)) { SearchBox.Clear(); e.Handled = true; break; }
+                HideAnimated();
                 e.Handled = true;
                 break;
             case Key.Right:
-                MoveSelection(+1);
-                e.Handled = true;
-                break;
+                MoveSelection(+1); e.Handled = true; break;
             case Key.Left:
-                MoveSelection(-1);
-                e.Handled = true;
-                break;
+                MoveSelection(-1); e.Handled = true; break;
             case Key.Down:
-                MoveSelection(+Columns);
-                e.Handled = true;
-                break;
+                MoveSelection(+step); e.Handled = true; break;
             case Key.Up:
-                MoveSelection(-Columns);
-                e.Handled = true;
-                break;
+                MoveSelection(-step); e.Handled = true; break;
             case Key.PageDown:
-                MoveSelection(+Columns * 3);
-                e.Handled = true;
-                break;
+                MoveSelection(+step * 3); e.Handled = true; break;
             case Key.PageUp:
-                MoveSelection(-Columns * 3);
-                e.Handled = true;
-                break;
+                MoveSelection(-step * 3); e.Handled = true; break;
             case Key.Home:
-                SelectIndex(0);
-                e.Handled = true;
-                break;
+                SelectIndex(0); e.Handled = true; break;
             case Key.End:
-                SelectIndex(ResultsList.Items.Count - 1);
-                e.Handled = true;
-                break;
+                SelectIndex(ActiveList.Items.Count - 1); e.Handled = true; break;
             case Key.Enter:
                 OpenSelected(locateInExplorer: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
-                e.Handled = true;
-                break;
+                e.Handled = true; break;
             case Key.C when (Keyboard.Modifiers & ModifierKeys.Control) != 0:
-                CopySelectedPath();
-                e.Handled = true;
-                break;
+                CopySelectedPath(); e.Handled = true; break;
         }
     }
 
@@ -443,14 +580,13 @@ public partial class MainWindow
         list.ScrollIntoView(list.SelectedItem);
     }
 
-    private void ResultsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         => OpenSelected(locateInExplorer: false);
 
     /// <summary>
     /// 右键分两种：点在条目上给条目菜单；点在空白处给"往首页加东西"的菜单。
-    /// （之前不管点哪儿都弹当前选中项的动作，空地上右键出现 wegame.exe 的菜单，很莫名其妙。）
     /// </summary>
-    private void ResultsList_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void ResultsList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var list = sender as ListBox ?? ActiveList;
         var hit = list.InputHitTest(e.GetPosition(list)) as DependencyObject;
@@ -586,7 +722,6 @@ public partial class MainWindow
         var item = SelectedItem();
         if (item == null) return;
 
-        // 折叠条不是真条目：点它只是展开
         if (item.IsGroup)
         {
             ViewModel.ExpandResults();
@@ -595,7 +730,6 @@ public partial class MainWindow
 
         if (!item.HasPath)
         {
-            // 软件条目偶尔没有记录安装路径：不静默失败，给一行提示
             ViewModel.Notify($"{item.Name} 没有记录可打开的位置");
             return;
         }
@@ -605,7 +739,6 @@ public partial class MainWindow
         {
             if (locateInExplorer)
             {
-                // 文件夹定位自己没意义，直接打开；文件才用 /select 高亮
                 var args = item.IsDirectory ? $"\"{item.Path}\"" : $"/select,\"{item.Path}\"";
                 Process.Start(new ProcessStartInfo("explorer.exe", args) { UseShellExecute = true });
             }
@@ -622,6 +755,34 @@ public partial class MainWindow
                 : "路径已不存在（可能被移动或删除）");
             return;
         }
-        Hide();
+        HideAnimated();
     }
+}
+
+/// <summary>筛选面板里的一枚芯片。</summary>
+public sealed class FilterOption : System.ComponentModel.INotifyPropertyChanged
+{
+    private bool _isChecked;
+
+    public FilterOption(string tag, string label)
+    {
+        Tag = tag;
+        Label = label;
+    }
+
+    public string Tag { get; }
+    public string Label { get; }
+
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value) return;
+            _isChecked = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsChecked)));
+        }
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }

@@ -1,15 +1,9 @@
 <Application x:Class="ShunSeek.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 调色板不写死在这里：ThemeManager 启动时把深/浅两套画刷铺进 Application 资源，
+         所有窗口一律 DynamicResource 引用，切换时整窗做颜色过渡。 -->
     <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <!-- WPF-UI 主题：浅色（Mica 透出桌面壁纸，磁贴用淡黑蒙层），
-                     与 Win11 开始菜单的观感一致。改为 Dark 只需要换这一行的值。 -->
-                <ui:ThemesDictionary Theme="Light" />
-                <ui:ControlsDictionary />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
+        <ResourceDictionary />
     </Application.Resources>
 </Application>

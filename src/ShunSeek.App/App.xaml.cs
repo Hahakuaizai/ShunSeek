@@ -29,6 +29,9 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        // 主题调色板要先于任何窗口铺进 Application 资源（XAML 全走 DynamicResource）
+        ThemeManager.Initialize();
+
         // 单实例：第二个进程把已有实例的窗口叫出来，然后自己退出（否则会两套索引/两套热键打架）
         _singleInstance = new Mutex(initiallyOwned: true, SingleInstanceMutex, out bool createdNew);
         if (!createdNew)
@@ -99,6 +102,13 @@ public partial class App : System.Windows.Application
                 initialQuery = e.Args[i + 1];
         }
 
+        // 调试：--theme light|dark 临时覆盖主题（不落盘），--open-filter 展开筛选面板
+        int themeIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--theme", StringComparison.OrdinalIgnoreCase));
+        if (themeIndex >= 0 && themeIndex + 1 < e.Args.Length)
+            ThemeManager.Apply(string.Equals(e.Args[themeIndex + 1], "light", StringComparison.OrdinalIgnoreCase)
+                ? AppTheme.Light : AppTheme.Dark, animate: false, persist: false);
+        bool openFilter = e.Args.Contains("--open-filter", StringComparer.OrdinalIgnoreCase);
+
         // 双击图标/直接运行 = 就是要用，直接把窗口弹出来（以前只有 --show 才弹，
         // 结果双击后只在托盘里躺着，像没启动一样）。开机自启带 --tray，安静地待在托盘。
         bool silent = e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase)
@@ -110,6 +120,7 @@ public partial class App : System.Windows.Application
             {
                 window.ShowWindow();
                 if (initialQuery != null) window.ApplyInitialQuery(initialQuery);
+                if (openFilter) window.OpenFilterForShot();
             });
         }
 
@@ -197,6 +208,7 @@ public partial class App : System.Windows.Application
                 window.ShowActivated = false;
                 window.Show();
                 if (initialQuery != null) window.ApplyInitialQuery(initialQuery);
+                if (openFilter) window.OpenFilterForShot();
                 _ = _index?.StartAsync();
 
                 // 索引没就绪的话截出来是"正在建立索引"，先等它就绪（缓存加载约 1 秒）
@@ -212,6 +224,11 @@ public partial class App : System.Windows.Application
                     try
                     {
                         window.CaptureToPng(shotPath);
+                        if (openFilter)
+                            window.CaptureFilterToPng(
+                                System.IO.Path.Combine(
+                                    System.IO.Path.GetDirectoryName(shotPath) ?? "",
+                                    System.IO.Path.GetFileNameWithoutExtension(shotPath) + "_filter.png"));
                         Log($"[shot] saved {shotPath}");
                     }
                     catch (Exception ex)

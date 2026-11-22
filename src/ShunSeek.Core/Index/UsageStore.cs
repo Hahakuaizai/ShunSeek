@@ -85,6 +85,15 @@ public sealed class UsageStore
         }
     }
 
+    /// <summary>
+    /// 忘掉一条使用记录。"从首页移除"时调用：不然取消固定后它还会从"最近使用"里
+    /// 冒出来，看起来像没移除、只是挪了个位置。
+    /// </summary>
+    public void Forget(string path)
+    {
+        lock (_lock) _map.Remove(path);
+    }
+
     public void Save()
     {
         if (_filePath == null) return;

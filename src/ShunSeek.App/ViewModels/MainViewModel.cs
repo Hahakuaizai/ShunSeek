@@ -360,6 +360,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (!item.HasPath) return;
         Pinned?.Remove(item.Path);
+        // 同时清掉使用记录：否则它会落进"最近使用"，用户看到的是"挪了一下"而不是"移除"
+        _usage?.Forget(item.Path);
+        _usage?.Save();
         ScheduleSearch();
     }
 

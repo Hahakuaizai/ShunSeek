@@ -13,15 +13,6 @@
         <FontFamily x:Key="SansFont">Noto Sans SC, Microsoft YaHei UI</FontFamily>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-        <SolidColorBrush x:Key="AccentBrush" Color="#FFC4573F" />
-        <SolidColorBrush x:Key="AccentText" Color="#FFD97A5F" />
-        <SolidColorBrush x:Key="TextHi" Color="#FFEDE9E1" />
-        <SolidColorBrush x:Key="TextMid" Color="#FF98A3A9" />
-        <SolidColorBrush x:Key="TextLow" Color="#FF69747A" />
-        <SolidColorBrush x:Key="HairLine" Color="#FF1E2529" />
-        <SolidColorBrush x:Key="SurfaceHover" Color="#FF1B2328" />
-        <SolidColorBrush x:Key="EdgeLine" Color="#FF232B30" />
-
         <Style TargetType="ScrollBar">
             <Setter Property="Width" Value="10" />
             <Setter Property="Background" Value="Transparent" />
@@ -37,7 +28,7 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border CornerRadius="4" Background="#FF2A3439" Margin="3,2" />
+                                                <Border CornerRadius="4" Background="{DynamicResource ThumbFill}" Margin="3,2" />
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -54,11 +45,11 @@
     </Window.Resources>
 
     <Grid Margin="0,0,18,18">
-        <ctl:LiquidPanel x:Name="Page" Radius="14" Fill="#FF12181B"
-                         Stroke="#FF2A353B" StrokeThickness="1">
+        <ctl:LiquidPanel x:Name="Page" Radius="14" Fill="{DynamicResource InkFill}"
+                         Stroke="{DynamicResource ShellStroke}" StrokeThickness="1">
             <ctl:LiquidPanel.Effect>
                 <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270"
-                                  Opacity="0.55" Color="#FF000000" />
+                                  Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowOpacity}" />
             </ctl:LiquidPanel.Effect>
 
             <Grid Margin="24,18,22,16" Background="Transparent"
@@ -79,31 +70,47 @@
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Width="30" Height="30" CornerRadius="8"
-                            Background="#26C4573F" BorderBrush="#59C4573F" BorderThickness="1"
+                            Background="{DynamicResource PillFill}" BorderBrush="{DynamicResource PillStroke}" BorderThickness="1"
                             VerticalAlignment="Center">
                         <TextBlock Text="&#xE895;" FontFamily="{StaticResource IconFont}" FontSize="13"
-                                   Foreground="{StaticResource AccentText}"
+                                   Foreground="{DynamicResource AccentText}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="11,0,0,0">
                         <TextBlock Text="已更新到最新版本" FontFamily="{StaticResource SerifFont}"
-                                   FontSize="15" Foreground="{StaticResource TextHi}" />
+                                   FontSize="15" Foreground="{DynamicResource TextHi}" />
                         <TextBlock Text="以下改动已在安装目录生效" FontFamily="{StaticResource SansFont}"
-                                   FontSize="10" Foreground="{StaticResource TextLow}" Margin="0,3,0,0" />
+                                   FontSize="10" Foreground="{DynamicResource TextLow}" Margin="0,3,0,0" />
                     </StackPanel>
 
                     <Button Grid.Column="2" Width="30" Height="28" Cursor="Hand"
-                            Click="Close_Click" Foreground="{StaticResource TextMid}">
+                            Click="Close_Click" Foreground="{DynamicResource TextMid}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" CornerRadius="8" Background="Transparent">
+                                <Grid>
+                                    <Border x:Name="Veil" CornerRadius="8" Background="{DynamicResource SurfaceHover}" Opacity="0" />
                                     <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource IconFont}" FontSize="10"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
+                                </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceHover}" />
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                                     To="1" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                                     To="0" Duration="0:0:0.18" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -114,8 +121,8 @@
                 <!-- 副题：时间 + 装到哪里，下面一道发丝线 -->
                 <StackPanel Grid.Row="1" Margin="0,13,0,0">
                     <TextBlock x:Name="Subtitle" FontFamily="{StaticResource SansFont}" FontSize="10"
-                               Foreground="{StaticResource TextLow}" TextTrimming="CharacterEllipsis" />
-                    <Rectangle Height="1" Margin="0,11,0,0" Fill="{StaticResource HairLine}" />
+                               Foreground="{DynamicResource TextLow}" TextTrimming="CharacterEllipsis" />
+                    <Rectangle Height="1" Margin="0,11,0,0" Fill="{DynamicResource HairLine}" />
                 </StackPanel>
 
                 <!-- 更新条目 -->
@@ -123,7 +130,7 @@
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                         <TextBlock x:Name="FallbackText" FontFamily="{StaticResource SerifFont}" FontSize="12.5"
-                                   Foreground="{StaticResource TextMid}" TextWrapping="Wrap" Margin="0,4,0,4" />
+                                   Foreground="{DynamicResource TextMid}" TextWrapping="Wrap" Margin="0,4,0,4" />
 
                         <ItemsControl x:Name="ItemsHost">
                             <ItemsControl.ItemTemplate>
@@ -133,11 +140,11 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Ellipse Width="4" Height="4" Fill="{StaticResource AccentBrush}"
+                                        <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentBrush}"
                                                  VerticalAlignment="Top" Margin="0,7,11,0" />
                                         <TextBlock Grid.Column="1" Text="{Binding}"
                                                    FontFamily="{StaticResource SerifFont}"
-                                                   FontSize="12.5" Foreground="{StaticResource TextHi}"
+                                                   FontSize="12.5" Foreground="{DynamicResource TextHi}"
                                                    TextWrapping="Wrap" />
                                     </Grid>
                                 </DataTemplate>
@@ -149,20 +156,37 @@
                 <!-- 页脚 -->
                 <Grid Grid.Row="3" Margin="0,14,0,0">
                     <TextBlock Text="按 Esc 关闭" FontFamily="{StaticResource SansFont}" FontSize="10"
-                               Foreground="{StaticResource TextLow}"
+                               Foreground="{DynamicResource TextLow}"
                                VerticalAlignment="Center" HorizontalAlignment="Left" />
 
                     <Button HorizontalAlignment="Right" Cursor="Hand" Click="Close_Click">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" CornerRadius="8" Background="#26C4573F"
-                                        BorderBrush="#66C4573F" BorderThickness="1" Padding="16,7">
+                                <Grid>
+                                    <Border CornerRadius="8" Background="{DynamicResource PillFill}"
+                                            BorderBrush="{DynamicResource PillStroke}" BorderThickness="1" />
+                                    <Border x:Name="Veil" CornerRadius="8" Background="{DynamicResource PillHover}" Opacity="0" />
                                     <TextBlock Text="知道了" FontFamily="{StaticResource SansFont}" FontSize="11"
-                                               Foreground="{StaticResource TextHi}" />
-                                </Border>
+                                               Foreground="{DynamicResource TextHi}" Margin="16,7" />
+                                </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#3AC4573F" />
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                                     To="1" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                                     To="0" Duration="0:0:0.18" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
