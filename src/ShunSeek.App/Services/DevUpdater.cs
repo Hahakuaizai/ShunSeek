@@ -349,11 +349,16 @@ internal static class DevUpdater
         {
             if (!File.Exists(PendingFile)) return null;
             var json = File.ReadAllText(PendingFile, Encoding.UTF8);
+            var parsed = JsonSerializer.Deserialize<PendingUpdate>(json);
             File.Delete(PendingFile);
-            return JsonSerializer.Deserialize<PendingUpdate>(json);
+            Log($"读到更新说明：{parsed?.Items.Count ?? 0} 条，文件改动 {parsed?.Files ?? 0} 个");
+            return parsed;
         }
-        catch
+        catch (Exception ex)
         {
+            // 说明文件坏了也删掉，不然每次启动都白读一遍
+            try { File.Delete(PendingFile); } catch { }
+            Log("读取更新说明失败：" + ex.Message);
             return null;
         }
     }

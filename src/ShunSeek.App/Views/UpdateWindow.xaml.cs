@@ -25,6 +25,9 @@ public partial class UpdateWindow : Window
         };
 
         Loaded += (_, _) => PositionNearCursor();
+
+        // 弹出与关闭都留一条日志，端到端测试时能看出弹窗到底有没有活下来
+        Closed += (_, _) => DevUpdater.Log("更新说明已关闭");
     }
 
     /// <summary>弹在鼠标所在那块屏的上方居中，和主窗同一个位置习惯。</summary>

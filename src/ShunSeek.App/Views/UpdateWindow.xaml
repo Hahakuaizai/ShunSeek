@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctl="clr-namespace:ShunSeek.App.Controls"
         Title="瞬觅 · 更新"
-        Width="480" Height="392"
+        Width="480" SizeToContent="Height" MaxHeight="620"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
         WindowStartupLocation="Manual">

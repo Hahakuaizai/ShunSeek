@@ -117,6 +117,30 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains("--dev-update", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(() => window.StartDevUpdate());
 
+        // 开发用：--update-preview 只弹更新说明（改样式时看效果，不用真跑一遍更新）
+        if (e.Args.Contains("--update-preview", StringComparer.OrdinalIgnoreCase))
+        {
+            silent = true;
+            Dispatcher.BeginInvoke(() =>
+            {
+                var sample = new PendingUpdate
+                {
+                    Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+                    Target = DevUpdater.TargetRoot,
+                    Files = 3,
+                    Items = new List<string>
+                    {
+                        "界面全部重绘为墨本深色主题",
+                        "右键菜单改为深色，跟窗口同一套墨色",
+                        "书眉副标题加分隔点",
+                    },
+                };
+                var previewWindow = new Views.UpdateWindow(sample);
+                previewWindow.Show();
+                previewWindow.Activate();
+            });
+        }
+
         // 开发/截图用：--shot <png> 把界面渲染成图片后退出。
         // 窗口放在屏幕外且不抢焦点，用户看不到——改样式时用它验证。
         int shotIndex = Array.FindIndex(e.Args, a => string.Equals(a, "--shot", StringComparison.OrdinalIgnoreCase));
@@ -172,10 +196,18 @@ public partial class App : System.Windows.Application
             var pending = DevUpdater.TakePendingUpdate();
             if (pending != null)
             {
-                window.ShowWindow();
-                var updateWindow = new UpdateWindow(pending);
-                updateWindow.Show();
-                updateWindow.Activate();
+                try
+                {
+                    window.ShowWindow();
+                    var updateWindow = new UpdateWindow(pending);
+                    updateWindow.Show();
+                    updateWindow.Activate();
+                    DevUpdater.Log("更新说明已弹出");
+                }
+                catch (Exception ex)
+                {
+                    DevUpdater.Log("弹出更新说明失败：" + ex);
+                }
             }
 
             var hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
