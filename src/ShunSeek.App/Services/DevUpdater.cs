@@ -403,15 +403,36 @@ internal static class DevUpdater
         return null;
     }
 
+    /// <summary>
+    /// 找 pwsh 7：店里装的 PowerShell 没有 Program Files\PowerShell\7，
+    /// 只有 WindowsApps 的别名，所以三条路都要试。
+    /// </summary>
     private static string? FindPwsh()
     {
         var candidates = new[]
         {
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell", "7", "pwsh.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "PowerShell", "7", "pwsh.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "pwsh.exe"),
         };
         foreach (var candidate in candidates)
             if (File.Exists(candidate)) return candidate;
+
+        // WindowsApps 里的别名可能被删掉，真正的包目录还在
+        try
+        {
+            var packages = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps");
+            if (Directory.Exists(packages))
+            {
+                foreach (var dir in Directory.GetDirectories(packages, "Microsoft.PowerShell*"))
+                {
+                    var exe = Path.Combine(dir, "pwsh.exe");
+                    if (File.Exists(exe)) return exe;
+                }
+            }
+        }
+        catch { /* 没权限读这个目录就算了 */ }
 
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
         {
