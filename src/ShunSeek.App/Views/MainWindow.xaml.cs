@@ -276,7 +276,7 @@ public partial class MainWindow
 
         menu.Items.Add(new Separator());
 
-        var update = new MenuItem { Header = "检查开发目录改动并更新（重启生效）" };
+        var update = new MenuItem { Header = "检查开发目录改动并更新" };
         update.Click += UpdateMenu_Click;
         menu.Items.Add(update);
 
