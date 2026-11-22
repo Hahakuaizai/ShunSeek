@@ -38,6 +38,7 @@ public partial class MainWindow
 
     private bool _hiding;
     private bool _closed;
+    private bool _exiting;
     private readonly TranslateTransform _rootShift = new();
     private DropShadowEffect? _shellShadow;
     private readonly List<FilterOption> _filterOptions = new();
@@ -310,7 +311,24 @@ public partial class MainWindow
 
     // ───────────────────────────── 顶栏按钮 ─────────────────────────────
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => HideAnimated();
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => ExitAnimated();
+
+    /// <summary>叉号退出：淡出收尾后直接结束进程，不驻留托盘。</summary>
+    private void ExitAnimated()
+    {
+        if (_hiding) return;
+        _hiding = true;
+        _exiting = true;
+        var fade = new DoubleAnimation(RootLayer.Opacity, 0, TimeSpan.FromMilliseconds(110));
+        fade.Completed += (_, _) =>
+        {
+            _hiding = false;
+            System.Windows.Application.Current?.Shutdown();
+        };
+        RootLayer.BeginAnimation(OpacityProperty, fade);
+        _rootShift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(_rootShift.Y, 6, TimeSpan.FromMilliseconds(110)));
+    }
 
     /// <summary>把窗口内容渲染成 PNG（离屏验证样式用，不依赖屏幕合成）。</summary>
     public void CaptureToPng(string path)
@@ -333,6 +351,14 @@ public partial class MainWindow
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (_exiting) return;
+        _exiting = true;
+        Dispatcher.BeginInvoke(() => System.Windows.Application.Current?.Shutdown());
+    }
 
     protected override void OnClosed(EventArgs e)
     {
