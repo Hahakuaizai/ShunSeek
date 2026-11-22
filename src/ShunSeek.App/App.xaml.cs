@@ -117,10 +117,16 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains("--dev-update", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(() => window.StartDevUpdate());
 
-        // 开发用：--update-preview 只弹更新说明（改样式时看效果，不用真跑一遍更新）
-        if (e.Args.Contains("--update-preview", StringComparer.OrdinalIgnoreCase))
+        // 开发用：--update-preview [png] 只弹更新说明；带 png 路径就离屏渲染后退出
+        int previewIndex = Array.FindIndex(e.Args, a =>
+            string.Equals(a, "--update-preview", StringComparison.OrdinalIgnoreCase));
+        if (previewIndex >= 0)
         {
             silent = true;
+            var shotPath = previewIndex + 1 < e.Args.Length && e.Args[previewIndex + 1].EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                ? e.Args[previewIndex + 1]
+                : null;
+
             Dispatcher.BeginInvoke(() =>
             {
                 var sample = new PendingUpdate
@@ -135,9 +141,46 @@ public partial class App : System.Windows.Application
                         "书眉副标题加分隔点",
                     },
                 };
+
                 var previewWindow = new Views.UpdateWindow(sample);
+                if (shotPath != null)
+                {
+                    previewWindow.Left = -6000;
+                    previewWindow.Top = -6000;
+                    previewWindow.ShowActivated = false;
+                }
                 previewWindow.Show();
-                previewWindow.Activate();
+
+                if (shotPath != null)
+                {
+                    var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                    int ticks = 0;
+                    timer.Tick += (_, _) =>
+                    {
+                        ticks++;
+                        try
+                        {
+                            previewWindow.CaptureToPng(shotPath);
+                            timer.Stop();
+                            DevUpdater.Log("[shot] update window saved " + shotPath);
+                            Shutdown();
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ticks >= 6)
+                            {
+                                timer.Stop();
+                                DevUpdater.Log("[shot] update window failed: " + ex.Message);
+                                Shutdown();
+                            }
+                        }
+                    };
+                    timer.Start();
+                }
+                else
+                {
+                    previewWindow.Activate();
+                }
             });
         }
 

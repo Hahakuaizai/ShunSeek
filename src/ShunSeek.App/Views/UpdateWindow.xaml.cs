@@ -52,4 +52,24 @@ public partial class UpdateWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>离屏渲染成 PNG（调弹窗样式时用，不依赖屏幕合成）。</summary>
+    public void CaptureToPng(string path)
+    {
+        var root = (FrameworkElement)Content;
+        root.UpdateLayout();
+
+        int width = (int)Math.Ceiling(root.ActualWidth);
+        int height = (int)Math.Ceiling(root.ActualHeight);
+        if (width <= 0 || height <= 0) throw new InvalidOperationException("弹窗还没完成布局");
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(root);
+
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
+    }
 }
