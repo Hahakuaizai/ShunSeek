@@ -334,7 +334,7 @@
                                Foreground="{StaticResource TextHi}" VerticalAlignment="Center" />
                     <Rectangle Width="1" Height="14" Fill="{StaticResource EdgeStrong}"
                                VerticalAlignment="Center" Margin="14,0,14,0" />
-                    <TextBlock Text="SHUNSEEK  本机索引" FontFamily="{StaticResource SansFont}" FontSize="9.5"
+                    <TextBlock Text="SHUNSEEK · 本机索引" FontFamily="{StaticResource SansFont}" FontSize="9.5"
                                Foreground="{StaticResource TextLow}" VerticalAlignment="Center" />
                 </StackPanel>
 
